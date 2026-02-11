@@ -1,6 +1,15 @@
 import generatedRegistry from "@/lib/generatedMethodRegistry.json";
 
 export type SchemaMode = "known" | "unknown";
+export type MethodCategoryId =
+  | "solana-rpc-apis"
+  | "digital-asset-standard-das"
+  | "wallet-api"
+  | "zk-compression"
+  | "custom";
+export type MethodTransport = "jsonrpc" | "http" | "custom";
+export type HttpMethod = "GET" | "POST";
+export type JsonRpcParamsStyle = "array" | "object";
 
 export interface StructuredField {
   name: string;
@@ -21,6 +30,13 @@ export interface JsonExampleSchema {
 
 export type StructuredSchema = TableSchema | JsonExampleSchema;
 
+export interface MethodHttpConfig {
+  method: HttpMethod;
+  path: string;
+  mainnetBaseUrl?: string;
+  devnetBaseUrl?: string;
+}
+
 export interface MethodErrorOutput {
   httpStatus: number;
   code?: number;
@@ -32,6 +48,10 @@ export interface MethodErrorOutput {
 export interface MethodRegistryEntry {
   method: string;
   docsUrl: string;
+  category?: MethodCategoryId;
+  transport?: MethodTransport;
+  jsonrpcParamsStyle?: JsonRpcParamsStyle;
+  http?: MethodHttpConfig;
   schema: SchemaMode;
   params?: StructuredSchema;
   response?: StructuredSchema;
@@ -50,6 +70,10 @@ export function getMethodEntry(method: string): MethodRegistryEntry | undefined 
   return methodRegistry.methods.find((entry) => entry.method === method);
 }
 
+export function getMethodEntries(): MethodRegistryEntry[] {
+  return [...methodRegistry.methods].sort((a, b) => a.method.localeCompare(b.method));
+}
+
 export function getMethodNames(): string[] {
-  return methodRegistry.methods.map((entry) => entry.method).sort((a, b) => a.localeCompare(b));
+  return getMethodEntries().map((entry) => entry.method);
 }

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import {
   BookOpen,
   ChevronDown,
+  KeyRound,
   Map as MapIcon,
   MessageSquareX,
   PanelRightClose,
@@ -19,16 +20,31 @@ import { NodeCard } from "@/components/NodeCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { QuickTooltip } from "@/components/ui/quick-tooltip";
-import { getMethodEntry, getMethodNames } from "@/lib/methodRegistry";
+import {
+  getMethodEntries,
+  getMethodEntry,
+  type MethodCategoryId,
+  type MethodRegistryEntry,
+} from "@/lib/methodRegistry";
 import { getByPath } from "@/lib/path";
 import { useWorkflowStore } from "@/store/workflowStore";
 import type { WorkflowNode } from "@/store/workflowStore";
 
 type RpcNetwork = "mainnet" | "devnet";
 
+interface MethodCategory {
+  id: MethodCategoryId;
+  label: string;
+  methods: string[];
+}
+
 const DEFAULT_HELIUS_RPC_URLS: Record<RpcNetwork, string> = {
   mainnet: "https://mainnet.helius-rpc.com",
   devnet: "https://devnet.helius-rpc.com",
+};
+const DEFAULT_HELIUS_HTTP_URLS: Record<RpcNetwork, string> = {
+  mainnet: "https://api.helius.xyz",
+  devnet: "https://api-devnet.helius.xyz",
 };
 
 function resolveParamValue(
@@ -52,12 +68,8 @@ function resolveParamValue(
   return value;
 }
 
-function parseRawParams(raw: string): unknown[] {
-  const parsed = JSON.parse(raw) as unknown;
-  if (!Array.isArray(parsed)) {
-    throw new Error("Raw params must be a JSON array");
-  }
-  return parsed;
+function parseRawParams(raw: string): unknown {
+  return JSON.parse(raw) as unknown;
 }
 
 function pruneNullish(value: unknown): unknown {
@@ -115,10 +127,30 @@ function setByDotPath(target: Record<string, unknown>, path: string, value: unkn
   }
 }
 
-function getNodeParams(node: WorkflowNode, outputsByNodeId: Map<string, unknown>): unknown[] {
+function getNodeParams(node: WorkflowNode, outputsByNodeId: Map<string, unknown>): unknown {
   const entry = getMethodEntry(node.method);
 
   if (entry?.params?.kind === "table") {
+    if (entry.jsonrpcParamsStyle === "object") {
+      const paramsObject: Record<string, unknown> = {};
+
+      entry.params.fields.forEach((field) => {
+        const binding = node.params.find((param) => param.name === field.name);
+        if (!binding) {
+          return;
+        }
+
+        const value = pruneNullish(resolveParamValue(binding.value, outputsByNodeId));
+        if (value === undefined) {
+          return;
+        }
+
+        setByDotPath(paramsObject, field.name, value);
+      });
+
+      return paramsObject;
+    }
+
     const args: unknown[] = [];
     const options: Record<string, unknown> = {};
 
@@ -155,9 +187,35 @@ function getNodeParams(node: WorkflowNode, outputsByNodeId: Map<string, unknown>
     return args;
   }
 
-  return parseRawParams(node.rawParamsJson)
-    .map((param) => pruneNullish(param))
-    .filter((param) => param !== undefined);
+  const raw = parseRawParams(node.rawParamsJson);
+  const cleaned = pruneNullish(raw);
+  return cleaned === undefined ? [] : cleaned;
+}
+
+function getNodeHttpParams(node: WorkflowNode, outputsByNodeId: Map<string, unknown>): Record<string, unknown> {
+  const entry = getMethodEntry(node.method);
+
+  if (entry?.params?.kind !== "table") {
+    throw new Error("HTTP methods require table-style params schema in the registry.");
+  }
+
+  const params: Record<string, unknown> = {};
+
+  entry.params.fields.forEach((field) => {
+    const binding = node.params.find((param) => param.name === field.name);
+    if (!binding) {
+      return;
+    }
+
+    const value = pruneNullish(resolveParamValue(binding.value, outputsByNodeId));
+    if (value === undefined) {
+      return;
+    }
+
+    params[field.name] = value;
+  });
+
+  return params;
 }
 
 function parseRpcResponse(text: string): unknown {
@@ -168,7 +226,7 @@ function parseRpcResponse(text: string): unknown {
   }
 }
 
-function buildHeliusRpcUrl(apiKey: string, network: RpcNetwork): string {
+function buildHeliusJsonRpcUrl(apiKey: string, network: RpcNetwork): string {
   const configured = process.env.NEXT_PUBLIC_HELIUS_RPC_URL;
   const baseUrl = configured ?? DEFAULT_HELIUS_RPC_URLS[network];
 
@@ -177,6 +235,81 @@ function buildHeliusRpcUrl(apiKey: string, network: RpcNetwork): string {
     url.searchParams.set("api-key", apiKey.trim());
   }
   return url.toString();
+}
+
+function appendQueryValue(searchParams: URLSearchParams, key: string, value: unknown): void {
+  if (value === undefined || value === null) {
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((entry) => appendQueryValue(searchParams, key, entry));
+    return;
+  }
+
+  if (typeof value === "object") {
+    searchParams.set(key, JSON.stringify(value));
+    return;
+  }
+
+  searchParams.set(key, String(value));
+}
+
+function buildHeliusHttpUrl(
+  apiKey: string,
+  network: RpcNetwork,
+  entry: MethodRegistryEntry,
+  params: Record<string, unknown>,
+  includeQueryParams = true,
+): string {
+  if (!entry.http) {
+    throw new Error("Missing HTTP config for method.");
+  }
+
+  const baseUrl =
+    network === "mainnet"
+      ? entry.http.mainnetBaseUrl ?? DEFAULT_HELIUS_HTTP_URLS.mainnet
+      : entry.http.devnetBaseUrl ?? DEFAULT_HELIUS_HTTP_URLS.devnet;
+
+  const unresolvedPath = entry.http.path;
+  const remainingParams: Record<string, unknown> = { ...params };
+  const resolvedPath = unresolvedPath.replace(/\{([^}]+)\}/g, (_, token: string) => {
+    const value = remainingParams[token];
+    if (value === undefined || value === null) {
+      throw new Error(`Missing required path param: ${token}`);
+    }
+    delete remainingParams[token];
+    return encodeURIComponent(String(value));
+  });
+
+  const url = /^https?:\/\//.test(resolvedPath)
+    ? new URL(resolvedPath)
+    : new URL(resolvedPath.replace(/^\//, ""), `${baseUrl.replace(/\/$/, "")}/`);
+
+  if (apiKey.trim()) {
+    url.searchParams.set("api-key", apiKey.trim());
+  }
+
+  if (includeQueryParams) {
+    for (const [key, value] of Object.entries(remainingParams)) {
+      appendQueryValue(url.searchParams, key, value);
+    }
+  }
+
+  return url.toString();
+}
+
+function getMethodCategoryId(entry: MethodRegistryEntry): MethodCategoryId {
+  return entry.category ?? "solana-rpc-apis";
+}
+
+function getCustomNodeOutput(node: WorkflowNode, outputsByNodeId: Map<string, unknown>): unknown {
+  const valueParam = node.params.find((param) => param.name === "value");
+  if (!valueParam) {
+    return null;
+  }
+
+  return resolveParamValue(valueParam.value, outputsByNodeId);
 }
 
 export default function HomePage() {
@@ -207,6 +340,8 @@ export default function HomePage() {
   const [showMethodPicker, setShowMethodPicker] = useState(false);
   const [showNodeMap, setShowNodeMap] = useState(false);
   const [methodQuery, setMethodQuery] = useState("");
+  const [selectedMethodCategoryId, setSelectedMethodCategoryId] = useState<MethodCategoryId>("solana-rpc-apis");
+  const [selectedMethod, setSelectedMethod] = useState<string>();
   const [draggingNodeId, setDraggingNodeId] = useState<string>();
   const [showInstructions, setShowInstructions] = useState(false);
   const [network, setNetwork] = useState<RpcNetwork>("mainnet");
@@ -216,14 +351,73 @@ export default function HomePage() {
     [order, nodes],
   );
 
-  const methodNames = useMemo(() => getMethodNames(), []);
+  const methodEntries = useMemo(() => getMethodEntries(), []);
+  const methodCategories = useMemo<MethodCategory[]>(
+    () => [
+      {
+        id: "solana-rpc-apis",
+        label: "Solana RPC APIs",
+        methods: methodEntries
+          .filter((entry) => getMethodCategoryId(entry) === "solana-rpc-apis")
+          .map((entry) => entry.method),
+      },
+      {
+        id: "digital-asset-standard-das",
+        label: "Digital Asset Standard (DAS)",
+        methods: methodEntries
+          .filter((entry) => getMethodCategoryId(entry) === "digital-asset-standard-das")
+          .map((entry) => entry.method),
+      },
+      {
+        id: "wallet-api",
+        label: "Wallet API",
+        methods: methodEntries
+          .filter((entry) => getMethodCategoryId(entry) === "wallet-api")
+          .map((entry) => entry.method),
+      },
+      {
+        id: "zk-compression",
+        label: "ZK Compression",
+        methods: methodEntries
+          .filter((entry) => getMethodCategoryId(entry) === "zk-compression")
+          .map((entry) => entry.method),
+      },
+      {
+        id: "custom",
+        label: "Custom",
+        methods: methodEntries
+          .filter((entry) => getMethodCategoryId(entry) === "custom")
+          .map((entry) => entry.method),
+      },
+    ],
+    [methodEntries],
+  );
+
+  const selectedCategory = useMemo(
+    () => methodCategories.find((category) => category.id === selectedMethodCategoryId) ?? methodCategories[0],
+    [methodCategories, selectedMethodCategoryId],
+  );
+
   const filteredMethods = useMemo(() => {
     const query = methodQuery.trim().toLowerCase();
+    const methods = selectedCategory?.methods ?? [];
     if (!query) {
-      return methodNames.slice(0, 40);
+      return methods;
     }
-    return methodNames.filter((method) => method.toLowerCase().includes(query)).slice(0, 40);
-  }, [methodNames, methodQuery]);
+    return methods.filter((method) => method.toLowerCase().includes(query));
+  }, [selectedCategory, methodQuery]);
+
+  const activeMethod = useMemo(() => {
+    if (selectedMethod && filteredMethods.includes(selectedMethod)) {
+      return selectedMethod;
+    }
+    return filteredMethods[0];
+  }, [filteredMethods, selectedMethod]);
+
+  const activeMethodEntry = useMemo(
+    () => (activeMethod ? methodEntries.find((entry) => entry.method === activeMethod) : undefined),
+    [activeMethod, methodEntries],
+  );
 
   const runRange = async (startIndex: number, endIndexExclusive: number) => {
     if (startIndex < 0) {
@@ -255,20 +449,63 @@ export default function HomePage() {
         setNodeStatus(node.id, "running");
 
         try {
-          const params = getNodeParams(node, outputsByNodeId);
+          const methodEntry = getMethodEntry(node.method);
+          const transport = methodEntry?.transport ?? "jsonrpc";
+          const apiKeyValue = useWorkflowStore.getState().apiKey;
 
-          const response = await fetch(buildHeliusRpcUrl(useWorkflowStore.getState().apiKey, network), {
-            method: "POST",
-            headers: {
-              "content-type": "application/json",
-            },
-            body: JSON.stringify({
-              jsonrpc: "2.0",
-              id: "1",
-              method: node.method,
-              params,
-            }),
-          });
+          let response: Response;
+
+          if (transport === "custom") {
+            const output = getCustomNodeOutput(node, outputsByNodeId);
+            setNodeOutput(node.id, output);
+            outputsByNodeId.set(node.id, output);
+            setNodeStatus(node.id, "success");
+            continue;
+          }
+
+          if (transport === "http") {
+            if (!methodEntry?.http) {
+              throw new Error(`Method ${node.method} is marked as HTTP but has no HTTP config.`);
+            }
+
+            const httpParams = getNodeHttpParams(node, outputsByNodeId);
+            const url = buildHeliusHttpUrl(
+              apiKeyValue,
+              network,
+              methodEntry,
+              httpParams,
+              methodEntry.http.method === "GET",
+            );
+
+            if (methodEntry.http.method === "POST") {
+              response = await fetch(url, {
+                method: "POST",
+                headers: {
+                  "content-type": "application/json",
+                },
+                body: JSON.stringify(httpParams),
+              });
+            } else {
+              response = await fetch(url, {
+                method: "GET",
+              });
+            }
+          } else {
+            const params = getNodeParams(node, outputsByNodeId);
+
+            response = await fetch(buildHeliusJsonRpcUrl(apiKeyValue, network), {
+              method: "POST",
+              headers: {
+                "content-type": "application/json",
+              },
+              body: JSON.stringify({
+                jsonrpc: "2.0",
+                id: "1",
+                method: node.method,
+                params,
+              }),
+            });
+          }
 
           const text = await response.text();
           const parsed = parseRpcResponse(text);
@@ -330,7 +567,7 @@ export default function HomePage() {
             <div className="flex items-center gap-2">
               <PanelRightClose className="h-8 w-8 text-primary" />
               <h1 className="text-[1.5rem] font-bold tracking-wide text-primary">DASH</h1>
-              <span className="text-sm text-foreground/50">RPC Workflow Builder</span>
+              <span className="text-sm text-foreground/50">Helius Workflow Builder</span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -434,7 +671,7 @@ export default function HomePage() {
         <section className="rounded-xl border border-border bg-background/80 p-4 shadow-lg shadow-black/25 backdrop-blur">
           <div className="flex flex-wrap items-end gap-4">
             <div className="min-w-64 flex-1">
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-foreground/65">Helius API Key</label>
+              <label className="mb-2 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-foreground/65"><KeyRound className="mr-1 h-3 w-3 text-primary" />Helius API Key</label>
               <Input
                 type="password"
                 autoComplete="off"
@@ -517,43 +754,157 @@ export default function HomePage() {
 
         {showMethodPicker ? (
           <section className="rounded-xl border border-border bg-background/80 p-4 shadow-lg shadow-black/25 backdrop-blur">
-            <div className="space-y-3 rounded-lg border border-border bg-background/60 p-3">
+            <div className="space-y-3">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-foreground/50" />
                 <Input
                   className="pl-8"
                   value={methodQuery}
                   onChange={(event) => setMethodQuery(event.target.value)}
-                  placeholder="Search RPC HTTP method"
+                  placeholder="Search methods in selected category"
                 />
               </div>
 
-              <div className="max-h-56 overflow-auto rounded-md border border-border bg-background p-1">
-                {filteredMethods.length === 0 ? (
-                  <p className="p-2 text-xs text-foreground/65">No methods in the current generated registry.</p>
-                ) : (
-                  <ul className="space-y-1">
-                    {filteredMethods.map((method) => (
-                      <li key={method}>
-                        <QuickTooltip content={`Add ${method} node`} className="block w-full">
+              <div className="grid h-[460px] gap-3 md:grid-cols-3">
+                <div className="min-h-0 rounded-lg border border-border bg-background/60">
+                  <div className="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
+                    Categories
+                  </div>
+                  <div className="h-[calc(460px-37px)] overflow-auto p-2">
+                    <ul className="space-y-1">
+                      {methodCategories.map((category) => (
+                        <li key={category.id}>
                           <Button
                             className="w-full justify-start"
-                            variant="secondary"
+                            variant={selectedCategory?.id === category.id ? "default" : "secondary"}
                             size="sm"
                             onClick={() => {
-                              addNode(method);
-                              setMethodQuery("");
-                              setShowMethodPicker(false);
+                              setSelectedMethodCategoryId(category.id);
+                              setSelectedMethod(undefined);
                             }}
-                            aria-label={`Add ${method} node`}
+                            aria-label={`Select ${category.label} category`}
                           >
-                            {method}
+                            <span className="truncate">{category.label}</span>
+                            <span className="ml-auto text-[11px] opacity-80">{category.methods.length}</span>
                           </Button>
-                        </QuickTooltip>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="min-h-0 rounded-lg border border-border bg-background/60">
+                  <div className="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
+                    Methods
+                  </div>
+                  <div className="h-[calc(460px-37px)] overflow-auto p-2">
+                    {filteredMethods.length === 0 ? (
+                      <p className="p-2 text-xs text-foreground/65">
+                        {selectedCategory?.methods.length === 0
+                          ? "No methods in this category yet."
+                          : "No methods match your search."}
+                      </p>
+                    ) : (
+                      <ul className="space-y-1">
+                        {filteredMethods.map((method) => (
+                          <li key={method}>
+                            <Button
+                              className="w-full justify-start"
+                              variant={activeMethod === method ? "default" : "secondary"}
+                              size="sm"
+                              onClick={() => setSelectedMethod(method)}
+                              aria-label={`Select ${method}`}
+                            >
+                              <span className="truncate">{method}</span>
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+
+                <div className="min-h-0 rounded-lg border border-border bg-background/60">
+                  <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-foreground/70">Method Details</span>
+                    <Button
+                      size="sm"
+                      className="h-7 px-2 text-[11px]"
+                      onClick={() => {
+                        if (!activeMethod) {
+                          return;
+                        }
+                        addNode(activeMethod);
+                        setMethodQuery("");
+                        setShowMethodPicker(false);
+                      }}
+                      disabled={!activeMethod}
+                      aria-label={activeMethod ? `Add ${activeMethod} node` : "Add selected method node"}
+                    >
+                      <Plus className="h-3 w-3" />
+                      Add Node
+                    </Button>
+                  </div>
+                  <div className="h-[calc(460px-37px)] overflow-auto p-3">
+                    {!activeMethod ? (
+                      <p className="text-xs text-foreground/65">
+                        Select a method to see input details and add it as a node.
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">{activeMethod}</p>
+                          <p className="text-xs text-foreground/65">
+                            Schema: {activeMethodEntry?.schema ?? "unknown"}
+                          </p>
+                          <p className="text-xs text-foreground/65">
+                            Request:{" "}
+                            {activeMethodEntry?.transport === "custom"
+                              ? "Local custom node"
+                              : activeMethodEntry?.transport === "http"
+                              ? `HTTP ${activeMethodEntry.http?.method ?? "GET"}`
+                              : "JSON-RPC POST"}
+                          </p>
+                        </div>
+
+                        {activeMethodEntry?.docsUrl ? (
+                          <a
+                            href={activeMethodEntry.docsUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex text-xs text-primary hover:underline"
+                          >
+                            Open docs
+                          </a>
+                        ) : null}
+
+                        {activeMethodEntry?.params?.kind === "table" ? (
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-foreground/70">Inputs</p>
+                            <ul className="space-y-2">
+                              {activeMethodEntry.params.fields.map((field) => (
+                                <li key={`${activeMethod}-${field.name}`} className="rounded-md border border-border bg-background/50 p-2">
+                                  <p className="text-xs font-medium text-foreground">{field.name}</p>
+                                  <p className="text-[11px] text-foreground/65">
+                                    {(field.type ?? "unknown").toLowerCase()} / {field.required ? "required" : "optional"}
+                                  </p>
+                                  {field.description ? <p className="mt-1 text-[11px] text-foreground/70">{field.description}</p> : null}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-foreground/70">Inputs</p>
+                            <p className="text-xs text-foreground/70">
+                              This method uses a raw JSON params array in the node editor.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </section>

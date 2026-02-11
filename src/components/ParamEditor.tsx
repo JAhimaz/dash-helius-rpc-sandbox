@@ -85,15 +85,15 @@ export function ParamEditor({
   if (!tableSchema) {
     return (
       <div className="space-y-2 rounded-md border border-border bg-background/60 p-3">
-        <Label htmlFor={`${node.id}-raw-params`}>Params (raw JSON array)</Label>
+        <Label htmlFor={`${node.id}-raw-params`}>Params (raw JSON)</Label>
         <Textarea
           id={`${node.id}-raw-params`}
           className="font-mono text-xs"
           value={node.rawParamsJson}
           onChange={(event) => onRawParamsChange(event.target.value)}
-          placeholder='["address", { "encoding": "jsonParsed" }]'
+          placeholder='{"id":"assetMintAddress"}'
         />
-        <p className="text-xs text-foreground/65">Unknown schema: enter parameters as a JSON array.</p>
+        <p className="text-xs text-foreground/65">Unknown schema: enter params as valid JSON (object or array).</p>
       </div>
     );
   }
@@ -105,6 +105,7 @@ export function ParamEditor({
           name: field.name,
           value: { type: "literal", value: null } as ParamValue,
         };
+        const isBooleanField = field.type?.toLowerCase() === "boolean";
         const presetOptions = getPresetOptions(field.name);
         const literalValue = param.value.type === "literal" ? param.value.value : null;
         const isPresetLiteral =
@@ -161,6 +162,45 @@ export function ParamEditor({
 
             {param.value.type === "literal" ? (
               <div className="space-y-2">
+                {isBooleanField ? (
+                  <select
+                    className="h-9 w-full rounded-md border border-border bg-background px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                    value={
+                      literalValue === true
+                        ? "true"
+                        : literalValue === false
+                          ? "false"
+                          : "null"
+                    }
+                    onChange={(event) => {
+                      if (event.target.value === "true") {
+                        onParamChange(field.name, {
+                          type: "literal",
+                          value: true,
+                        });
+                        return;
+                      }
+
+                      if (event.target.value === "false") {
+                        onParamChange(field.name, {
+                          type: "literal",
+                          value: false,
+                        });
+                        return;
+                      }
+
+                      onParamChange(field.name, {
+                        type: "literal",
+                        value: null,
+                      });
+                    }}
+                  >
+                    <option value="null">null</option>
+                    <option value="true">true</option>
+                    <option value="false">false</option>
+                  </select>
+                ) : null}
+
                 {presetOptions ? (
                   <select
                     className="h-9 w-full rounded-md border border-border bg-background px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
@@ -198,7 +238,7 @@ export function ParamEditor({
                   </select>
                 ) : null}
 
-                {(!presetOptions || presetSelectValue === CUSTOM_LITERAL_OPTION) ? (
+                {!isBooleanField && (!presetOptions || presetSelectValue === CUSTOM_LITERAL_OPTION) ? (
                   <Textarea
                     className="min-h-16 font-mono text-xs"
                     value={serializeLiteral(param.value.value)}

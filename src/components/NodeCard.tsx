@@ -118,6 +118,20 @@ export function NodeCard({
           </div>
           <div className="flex items-center gap-2">
             <Badge variant={statusVariant(node.status)}>{node.status}</Badge>
+            <QuickTooltip content="Delete this node">
+              <Button
+                size="sm"
+                variant="destructive"
+                className="h-7 w-7 p-0"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onDelete();
+                }}
+                aria-label="Delete this node"
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </QuickTooltip>
             <QuickTooltip content={node.outputOpen ? "Collapse node details" : "Expand node details"}>
               <Button
                 size="sm"
@@ -192,20 +206,6 @@ export function NodeCard({
                 >
                   <PlayCircle className="h-3 w-3" />
                   Run From Here
-                </Button>
-              </QuickTooltip>
-              <QuickTooltip content="Delete this node">
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onDelete();
-                  }}
-                  aria-label="Delete this node"
-                >
-                  <Trash2 className="h-3 w-3" />
-                  Delete
                 </Button>
               </QuickTooltip>
             </div>

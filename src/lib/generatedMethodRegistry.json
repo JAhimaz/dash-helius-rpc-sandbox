@@ -171,6 +171,780 @@
       ]
     },
     {
+      "method": "getAsset",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/das/getasset",
+      "category": "digital-asset-standard-das",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "id",
+            "type": "string",
+            "required": true,
+            "description": "The unique identifier (typically mint address) of the Solana NFT or digital asset to retrieve."
+          },
+          {
+            "name": "options",
+            "type": "object",
+            "required": false,
+            "description": "Display and formatting options for the asset data response."
+          },
+          {
+            "name": "options.showUnverifiedCollections",
+            "type": "boolean",
+            "required": false,
+            "description": "Display grouping information for unverified collections instead of skipping them. Default: false."
+          },
+          {
+            "name": "options.showCollectionMetadata",
+            "type": "boolean",
+            "required": false,
+            "description": "Display metadata for the collection. Default: false."
+          },
+          {
+            "name": "options.showFungible",
+            "type": "boolean",
+            "required": false,
+            "description": "Display fungible tokens held by the owner. Default: false."
+          },
+          {
+            "name": "options.showInscription",
+            "type": "boolean",
+            "required": false,
+            "description": "Display inscription details of assets inscribed on-chain. Default: false."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "jsonrpc": "2.0",
+          "id": "test",
+          "result": {
+            "last_indexed_slot": 365749093,
+            "interface": "ProgrammableNFT",
+            "id": "F9Lw3ki3hJ7PF9HQXsBzoY8GyE6sPoEZZdXJBsTTD2rk",
+            "content": {
+              "json_uri": "https://madlads.s3.us-west-2.amazonaws.com/json/8420.json",
+              "metadata": {
+                "name": "Mad Lads #8420",
+                "symbol": "MAD",
+                "token_standard": "ProgrammableNonFungible"
+              }
+            },
+            "ownership": {
+              "owner": "4zdNGgAtFsW1cQgHqkiWyRsxaAgxrSRRynnuunxzjxue",
+              "delegated": false,
+              "frozen": true,
+              "ownership_model": "single"
+            },
+            "token_info": {
+              "supply": 1,
+              "decimals": 0
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "httpStatus": 400,
+          "code": -32602,
+          "message": "Invalid request parameters.",
+          "description": "Bad Request - invalid syntax or parameters.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32602,
+              "message": "Invalid request parameters."
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 401,
+          "code": -32001,
+          "message": "Authentication failed. Missing or invalid API key.",
+          "description": "Unauthorized - missing or invalid API key.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32001,
+              "message": "Authentication failed. Missing or invalid API key."
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 403,
+          "code": -32003,
+          "message": "You do not have permission to access this resource.",
+          "description": "Forbidden.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32003,
+              "message": "You do not have permission to access this resource."
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 404,
+          "code": -32004,
+          "message": "The requested asset was not found.",
+          "description": "Not Found.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32004,
+              "message": "The requested asset was not found."
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 429,
+          "code": -32029,
+          "message": "Rate limit exceeded. Please try again later.",
+          "description": "Too Many Requests.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32029,
+              "message": "Rate limit exceeded. Please try again later."
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 500,
+          "code": -32000,
+          "message": "An unexpected error occurred on the server.",
+          "description": "Internal Server Error.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32000,
+              "message": "An unexpected error occurred on the server."
+            },
+            "id": "1"
+          }
+        }
+      ]
+    },
+    {
+      "method": "getAssetBatch",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/das/getassetbatch",
+      "category": "digital-asset-standard-das",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "ids",
+            "type": "array",
+            "required": true,
+            "description": "Array of asset IDs (up to 1,000) to retrieve in a single batch request."
+          },
+          {
+            "name": "options",
+            "type": "object",
+            "required": false,
+            "description": "Display options for the response."
+          },
+          {
+            "name": "options.showUnverifiedCollections",
+            "type": "boolean",
+            "required": false,
+            "description": "Display grouping information for unverified collections instead of skipping them. Default: false."
+          },
+          {
+            "name": "options.showCollectionMetadata",
+            "type": "boolean",
+            "required": false,
+            "description": "Display metadata for the collection. Default: false."
+          },
+          {
+            "name": "options.showFungible",
+            "type": "boolean",
+            "required": false,
+            "description": "Display fungible tokens held by the owner. Default: false."
+          },
+          {
+            "name": "options.showInscription",
+            "type": "boolean",
+            "required": false,
+            "description": "Display inscription details of assets inscribed on-chain. Default: false."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "jsonrpc": "2.0",
+          "id": "1",
+          "result": [
+            {
+              "interface": "ProgrammableNFT",
+              "id": "F9Lw3ki3hJ7PF9HQXsBzoY8GyE6sPoEZZdXJBsTTD2rk",
+              "content": {
+                "last_indexed_slot": 365750752,
+                "json_uri": "https://madlads.s3.us-west-2.amazonaws.com/json/8420.json",
+                "metadata": {
+                  "name": "Mad Lads #8420",
+                  "symbol": "MAD"
+                }
+              },
+              "ownership": {
+                "owner": "4zdNGgAtFsW1cQgHqkiWyRsxaAgxrSRRynnuunxzjxue",
+                "delegated": false,
+                "frozen": true,
+                "ownership_model": "single"
+              },
+              "token_info": {
+                "symbol": "MAD",
+                "supply": 1,
+                "decimals": 0
+              }
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "httpStatus": 400,
+          "code": -32602,
+          "message": "Invalid request parameters.",
+          "description": "Bad Request - invalid syntax or parameters.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32602,
+              "message": "Invalid request parameters."
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 401,
+          "code": -32001,
+          "message": "Authentication failed. Missing or invalid API key.",
+          "description": "Unauthorized - missing or invalid API key.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32001,
+              "message": "Authentication failed. Missing or invalid API key."
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 403,
+          "code": -32003,
+          "message": "You do not have permission to access this resource.",
+          "description": "Forbidden.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32003,
+              "message": "You do not have permission to access this resource."
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 404,
+          "code": -32004,
+          "message": "One or more assets in the batch were not found.",
+          "description": "Not Found.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32004,
+              "message": "One or more assets in the batch were not found."
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 429,
+          "code": -32029,
+          "message": "Rate limit exceeded. Please try again later.",
+          "description": "Too Many Requests.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32029,
+              "message": "Rate limit exceeded. Please try again later."
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 500,
+          "code": -32000,
+          "message": "An unexpected error occurred on the server.",
+          "description": "Internal Server Error.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32000,
+              "message": "An unexpected error occurred on the server."
+            },
+            "id": "1"
+          }
+        }
+      ]
+    },
+    {
+      "method": "getAssetsByCreator",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/das/getassetsbycreator",
+      "category": "digital-asset-standard-das",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "creatorAddress",
+            "type": "string",
+            "required": true,
+            "description": "The Solana wallet address of the creator to retrieve all digital assets for."
+          },
+          {
+            "name": "page",
+            "type": "number",
+            "required": false,
+            "description": "The page of results to return."
+          },
+          {
+            "name": "limit",
+            "type": "number",
+            "required": false,
+            "description": "The maximum number of assets to return."
+          },
+          {
+            "name": "sortBy",
+            "type": "object",
+            "required": false,
+            "description": "Sorting options for the response."
+          },
+          {
+            "name": "sortBy.sortBy",
+            "type": "string",
+            "required": false,
+            "description": "Sort criteria: created | recent_action | updated | none."
+          },
+          {
+            "name": "sortBy.sortDirection",
+            "type": "string",
+            "required": false,
+            "description": "Sort direction: asc | desc."
+          },
+          {
+            "name": "before",
+            "type": "string",
+            "required": false,
+            "description": "Cursor for paginating backwards through the assets."
+          },
+          {
+            "name": "after",
+            "type": "string",
+            "required": false,
+            "description": "Cursor for paginating forwards through the assets."
+          },
+          {
+            "name": "options",
+            "type": "object",
+            "required": false,
+            "description": "Display options for the response."
+          },
+          {
+            "name": "options.showUnverifiedCollections",
+            "type": "boolean",
+            "required": false,
+            "description": "Display grouping information for unverified collections instead of skipping them. Default: false."
+          },
+          {
+            "name": "options.showCollectionMetadata",
+            "type": "boolean",
+            "required": false,
+            "description": "Display metadata for the collection. Default: false."
+          },
+          {
+            "name": "options.showGrandTotal",
+            "type": "boolean",
+            "required": false,
+            "description": "Show total number of matched assets (slower). Default: false."
+          },
+          {
+            "name": "options.showInscription",
+            "type": "boolean",
+            "required": false,
+            "description": "Display inscription details of assets with on-chain inscriptions. Default: false."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "jsonrpc": "2.0",
+          "result": {
+            "last_indexed_slot": 365750752,
+            "total": 1,
+            "limit": 1,
+            "page": 1,
+            "items": [
+              {
+                "interface": "Custom",
+                "id": "JEH7cJxAKdprFG5AvdsY2c4ZqojxLBjFmw19zADV6oK5",
+                "content": {},
+                "authorities": [
+                  {}
+                ],
+                "compression": {},
+                "grouping": [
+                  {}
+                ],
+                "royalty": {},
+                "creators": [
+                  {}
+                ],
+                "ownership": {}
+              }
+            ]
+          },
+          "id": "1"
+        }
+      },
+      "errors": [
+        {
+          "httpStatus": 400,
+          "code": -32602,
+          "message": "Invalid request parameters.",
+          "description": "Bad Request - invalid syntax or parameters.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32602,
+              "message": "Invalid request parameters."
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 401,
+          "code": -32001,
+          "message": "Authentication failed. Missing or invalid API key.",
+          "description": "Unauthorized - missing or invalid API key.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32001,
+              "message": "Authentication failed. Missing or invalid API key."
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 403,
+          "code": -32003,
+          "message": "You do not have permission to access this resource.",
+          "description": "Forbidden.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32003,
+              "message": "You do not have permission to access this resource."
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 404,
+          "code": -32004,
+          "message": "No assets found for the specified creator.",
+          "description": "Not Found.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32004,
+              "message": "No assets found for the specified creator."
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 429,
+          "code": -32029,
+          "message": "Rate limit exceeded. Please try again later.",
+          "description": "Too Many Requests.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32029,
+              "message": "Rate limit exceeded. Please try again later."
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 500,
+          "code": -32000,
+          "message": "An unexpected error occurred on the server.",
+          "description": "Internal Server Error.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32000,
+              "message": "An unexpected error occurred on the server."
+            },
+            "id": "1"
+          }
+        }
+      ]
+    },
+    {
+      "method": "getAssetsByOwner",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/das/getassetsbyowner",
+      "category": "digital-asset-standard-das",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "ownerAddress",
+            "type": "string",
+            "required": true,
+            "description": "The Solana wallet address to retrieve all owned digital assets for."
+          },
+          {
+            "name": "page",
+            "type": "number",
+            "required": false,
+            "description": "Page number for paginating through large asset collections (1-based indexing)."
+          },
+          {
+            "name": "limit",
+            "type": "number",
+            "required": false,
+            "description": "Maximum number of assets to return per page (up to 1000)."
+          },
+          {
+            "name": "before",
+            "type": "string",
+            "required": false,
+            "description": "Pagination cursor for retrieving assets before this position."
+          },
+          {
+            "name": "after",
+            "type": "string",
+            "required": false,
+            "description": "Pagination cursor for retrieving assets after this position."
+          },
+          {
+            "name": "sortBy",
+            "type": "object",
+            "required": false,
+            "description": "Sorting configuration for ordering the returned Solana assets."
+          },
+          {
+            "name": "sortBy.sortBy",
+            "type": "string",
+            "required": false,
+            "description": "Sort criteria: created | recent_action | updated | none."
+          },
+          {
+            "name": "sortBy.sortDirection",
+            "type": "string",
+            "required": false,
+            "description": "Sort direction: asc | desc."
+          },
+          {
+            "name": "options",
+            "type": "object",
+            "required": false,
+            "description": "Display and filtering options for returned Solana asset data."
+          },
+          {
+            "name": "options.showUnverifiedCollections",
+            "type": "boolean",
+            "required": false,
+            "description": "Include grouping information for unverified collections. Default: false."
+          },
+          {
+            "name": "options.showCollectionMetadata",
+            "type": "boolean",
+            "required": false,
+            "description": "Include detailed metadata for collections. Default: false."
+          },
+          {
+            "name": "options.showGrandTotal",
+            "type": "boolean",
+            "required": false,
+            "description": "Include grand total count (may increase response time). Default: false."
+          },
+          {
+            "name": "options.showFungible",
+            "type": "boolean",
+            "required": false,
+            "description": "Include SPL tokens and fungible assets. Default: false."
+          },
+          {
+            "name": "options.showNativeBalance",
+            "type": "boolean",
+            "required": false,
+            "description": "Include native SOL balance. Default: false."
+          },
+          {
+            "name": "options.showInscription",
+            "type": "boolean",
+            "required": false,
+            "description": "Include inscription details for assets with inscriptions. Default: false."
+          },
+          {
+            "name": "options.showZeroBalance",
+            "type": "boolean",
+            "required": false,
+            "description": "Include assets with zero balance. Default: false."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "jsonrpc": "2.0",
+          "id": "text",
+          "result": {
+            "last_indexed_slot": 365750752,
+            "total": 1,
+            "limit": 1,
+            "page": 1,
+            "items": [
+              {
+                "interface": "V1_NFT",
+                "id": "JCfTS6dmJZY4NXhjMwHqayGGHUwxp59pzcYhZrYqMBce",
+                "content": {
+                  "json_uri": "https://www.hi-hi.vip/json/5000wif.json",
+                  "files": [
+                    {
+                      "uri": "https://img.hi-hi.vip/json/img/5000wif.png",
+                      "mime": "image/png"
+                    }
+                  ]
+                },
+                "ownership": {
+                  "owner": "86xCnPeV69n6t3DnyGvkKobf9FdN2H9oiVDdaMpo2MMY",
+                  "delegated": true,
+                  "frozen": false,
+                  "ownership_model": "single"
+                },
+                "compression": {
+                  "compressed": true,
+                  "eligible": false
+                }
+              }
+            ]
+          }
+        }
+      },
+      "errors": [
+        {
+          "httpStatus": 400,
+          "code": -32602,
+          "message": "Invalid request parameters.",
+          "description": "Bad Request - invalid syntax or parameters.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32602,
+              "message": "Invalid request parameters."
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 401,
+          "code": -32001,
+          "message": "Authentication failed. Missing or invalid API key.",
+          "description": "Unauthorized - missing or invalid API key.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32001,
+              "message": "Authentication failed. Missing or invalid API key."
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 403,
+          "code": -32003,
+          "message": "You do not have permission to access this resource.",
+          "description": "Forbidden.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32003,
+              "message": "You do not have permission to access this resource."
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 404,
+          "code": -32004,
+          "message": "No assets found for the specified owner.",
+          "description": "Not Found.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32004,
+              "message": "No assets found for the specified owner."
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 429,
+          "code": -32029,
+          "message": "Rate limit exceeded. Please try again later.",
+          "description": "Too Many Requests.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32029,
+              "message": "Rate limit exceeded. Please try again later."
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 500,
+          "code": -32000,
+          "message": "An unexpected error occurred on the server.",
+          "description": "Internal Server Error.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32000,
+              "message": "An unexpected error occurred on the server."
+            },
+            "id": "1"
+          }
+        }
+      ]
+    },
+    {
       "method": "getBalance",
       "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getbalance",
       "schema": "known",
@@ -208,1241 +982,6 @@
             },
             "value": 0
           }
-        }
-      },
-      "errors": [
-        {
-          "httpStatus": 400,
-          "code": -32602,
-          "message": "Invalid params",
-          "description": "Bad Request - Invalid request parameters or malformed request.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32602,
-              "message": "Invalid params"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 401,
-          "code": -32001,
-          "message": "Unauthorized",
-          "description": "Unauthorized - Invalid or missing API key.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32001,
-              "message": "Unauthorized"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 429,
-          "code": -32005,
-          "message": "Too many requests",
-          "description": "Too Many Requests - Rate limit exceeded.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32005,
-              "message": "Too many requests"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 500,
-          "code": -32603,
-          "message": "Internal error",
-          "description": "Internal Server Error - An error occurred on the server.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32603,
-              "message": "Internal error"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 503,
-          "code": -32002,
-          "message": "Service unavailable",
-          "description": "Service Unavailable - The service is temporarily unavailable.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32002,
-              "message": "Service unavailable"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 504,
-          "code": -32003,
-          "message": "Gateway timeout",
-          "description": "Gateway Timeout - The request timed out.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32003,
-              "message": "Gateway timeout"
-            },
-            "id": "1"
-          }
-        }
-      ]
-    },
-    {
-      "method": "getMultipleAccounts",
-      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getmultipleaccounts",
-      "schema": "known",
-      "params": {
-        "kind": "table",
-        "fields": [
-          {
-            "name": "address",
-            "type": "array",
-            "required": true,
-            "description": "Array of Solana account addresses (up to 100) to fetch in a single optimized batch request."
-          },
-          {
-            "name": "commitment",
-            "type": "string",
-            "required": false,
-            "description": "The commitment level for the request. confirmed | finalized | processed"
-          },
-          {
-            "name": "minContextSlot",
-            "type": "number",
-            "required": false,
-            "description": "The minimum slot that the request can be evaluated at."
-          },
-          {
-            "name": "dataSlice",
-            "type": "object",
-            "required": false,
-            "description": "Request a slice of the account's data."
-          },
-          {
-            "name": "dataSlice.length",
-            "type": "number",
-            "required": false,
-            "description": "Number of bytes to return."
-          },
-          {
-            "name": "dataSlice.offset",
-            "type": "number",
-            "required": false,
-            "description": "Byte offset from which to start reading."
-          },
-          {
-            "name": "encoding",
-            "type": "string",
-            "required": false,
-            "description": "Encoding format for the returned account data. jsonParsed | base58 | base64 | base64+zstd"
-          },
-          {
-            "name": "changedSinceSlot",
-            "type": "number",
-            "required": false,
-            "description": "Only return accounts that have been modified at or after this slot number. For accounts that exist but haven't changed since the specified slot, the response will contain status as unchanged."
-          }
-        ]
-      },
-      "response": {
-        "kind": "json_example",
-        "value": {
-          "jsonrpc": "2.0",
-          "id": "1",
-          "result": {
-            "context": {
-              "apiVersion": "2.0.15",
-              "slot": 341197247
-            },
-            "value": [
-              {
-                "lamports": 88849814690250,
-                "owner": "11111111111111111111111111111111",
-                "data": [
-                  "",
-                  "base58"
-                ],
-                "executable": false,
-                "rentEpoch": 18446744073709552000,
-                "space": 0
-              },
-              {
-                "status": "unchanged"
-              },
-              null
-            ]
-          }
-        }
-      },
-      "errors": [
-        {
-          "httpStatus": 400,
-          "code": -32602,
-          "message": "Invalid params",
-          "description": "Bad Request - Invalid request parameters or malformed request.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32602,
-              "message": "Invalid params",
-              "data": {
-                "additionalInfo": "Please check the request parameters and ensure they are valid."
-              }
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 401,
-          "code": -32001,
-          "message": "Unauthorized",
-          "description": "Unauthorized - Invalid or missing API key.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32001,
-              "message": "Unauthorized",
-              "data": {
-                "additionalInfo": "Please verify your API key and try again."
-              }
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 429,
-          "code": -32005,
-          "message": "Too many requests",
-          "description": "Too Many Requests - Rate limit exceeded.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32005,
-              "message": "Too many requests",
-              "data": {
-                "additionalInfo": "You have exceeded the allowed number of requests. Please wait and try again later."
-              }
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 500,
-          "code": -32603,
-          "message": "Internal error",
-          "description": "Internal Server Error - An error occurred on the server.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32603,
-              "message": "Internal error",
-              "data": {
-                "additionalInfo": "An unexpected error occurred on the server. Please try again later or contact support."
-              }
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 503,
-          "code": -32002,
-          "message": "Service unavailable",
-          "description": "Service Unavailable - The service is temporarily unavailable.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32002,
-              "message": "Service unavailable",
-              "data": {
-                "additionalInfo": "The service is currently unavailable. Please try again later or contact support."
-              }
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 504,
-          "code": -32003,
-          "message": "Gateway timeout",
-          "description": "Gateway Timeout - The request timed out.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32003,
-              "message": "Gateway timeout",
-              "data": {
-                "additionalInfo": "The request timed out. Please try again later or contact support."
-              }
-            },
-            "id": "1"
-          }
-        }
-      ]
-    },
-    {
-      "method": "getProgramAccounts",
-      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getprogramaccounts",
-      "schema": "known",
-      "params": {
-        "kind": "table",
-        "fields": [
-          {
-            "name": "address",
-            "type": "string",
-            "required": true,
-            "description": "The Solana program public key (address) to query accounts for, as a base-58 encoded string."
-          },
-          {
-            "name": "commitment",
-            "type": "string",
-            "required": false,
-            "description": "The commitment level for the request. confirmed | finalized | processed"
-          },
-          {
-            "name": "minContextSlot",
-            "type": "number",
-            "required": false,
-            "description": "The minimum slot that the request can be evaluated at."
-          },
-          {
-            "name": "withContext",
-            "type": "boolean",
-            "required": false,
-            "description": "Wrap the result in an RpcResponse JSON object."
-          },
-          {
-            "name": "encoding",
-            "type": "string",
-            "required": false,
-            "description": "Encoding format for the returned account data. jsonParsed | base58 | base64 | base64+zstd"
-          },
-          {
-            "name": "dataSlice",
-            "type": "object",
-            "required": false,
-            "description": "Request a slice of the account's data."
-          },
-          {
-            "name": "dataSlice.length",
-            "type": "number",
-            "required": false,
-            "description": "Number of bytes to return."
-          },
-          {
-            "name": "dataSlice.offset",
-            "type": "number",
-            "required": false,
-            "description": "Byte offset from which to start reading."
-          },
-          {
-            "name": "changedSinceSlot",
-            "type": "number",
-            "required": false,
-            "description": "Only return accounts that were modified at or after this slot number. Useful for incremental updates."
-          },
-          {
-            "name": "filters",
-            "type": "array",
-            "required": false,
-            "description": "Powerful filtering system to efficiently query specific Solana account data patterns."
-          }
-        ]
-      },
-      "response": {
-        "kind": "json_example",
-        "value": {
-          "jsonrpc": "2.0",
-          "id": "1",
-          "result": [
-            {
-              "pubkey": "CxELquR1gPP8wHe33gZ4QxqGB3sZ9RSwsJ2KshVewkFY",
-              "account": {
-                "lamports": 15298080,
-                "owner": "4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T",
-                "data": [
-                  "2R9jLfiAQ9bgdcw6h8s44439",
-                  "base58"
-                ],
-                "executable": false,
-                "rentEpoch": 28,
-                "space": 42
-              }
-            }
-          ]
-        }
-      },
-      "errors": [
-        {
-          "httpStatus": 400,
-          "code": -32602,
-          "message": "Invalid params",
-          "description": "Bad Request - Invalid request parameters or malformed request.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32602,
-              "message": "Invalid params",
-              "data": {}
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 401,
-          "code": -32001,
-          "message": "Unauthorized",
-          "description": "Unauthorized - Invalid or missing API key.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32001,
-              "message": "Unauthorized",
-              "data": {}
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 429,
-          "code": -32005,
-          "message": "Too many requests",
-          "description": "Too Many Requests - Rate limit exceeded.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32005,
-              "message": "Too many requests",
-              "data": {}
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 500,
-          "code": -32603,
-          "message": "Internal error",
-          "description": "Internal Server Error - An error occurred on the server.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32603,
-              "message": "Internal error",
-              "data": {}
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 503,
-          "code": -32002,
-          "message": "Service unavailable",
-          "description": "Service Unavailable - The service is temporarily unavailable.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32002,
-              "message": "Service unavailable",
-              "data": {}
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 504,
-          "code": -32003,
-          "message": "Gateway timeout",
-          "description": "Gateway Timeout - The request timed out.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32003,
-              "message": "Gateway timeout",
-              "data": {}
-            },
-            "id": "1"
-          }
-        }
-      ]
-    },
-    {
-      "method": "getProgramAccountsV2",
-      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getprogramaccountsv2",
-      "schema": "known",
-      "params": {
-        "kind": "table",
-        "fields": [
-          {
-            "name": "address",
-            "type": "string",
-            "required": true,
-            "description": "The Solana program public key (address) to query accounts for, as a base-58 encoded string."
-          },
-          {
-            "name": "commitment",
-            "type": "string",
-            "required": false,
-            "description": "The commitment level for the request. confirmed | finalized | processed"
-          },
-          {
-            "name": "minContextSlot",
-            "type": "number",
-            "required": false,
-            "description": "The minimum slot that the request can be evaluated at."
-          },
-          {
-            "name": "withContext",
-            "type": "boolean",
-            "required": false,
-            "description": "Wrap the result in an RpcResponse JSON object."
-          },
-          {
-            "name": "encoding",
-            "type": "string",
-            "required": false,
-            "description": "Encoding format for the returned account data. jsonParsed | base58 | base64 | base64+zstd"
-          },
-          {
-            "name": "dataSlice",
-            "type": "object",
-            "required": false,
-            "description": "Request a slice of the account's data."
-          },
-          {
-            "name": "dataSlice.length",
-            "type": "number",
-            "required": false,
-            "description": "Number of bytes to return."
-          },
-          {
-            "name": "dataSlice.offset",
-            "type": "number",
-            "required": false,
-            "description": "Byte offset from which to start reading."
-          },
-          {
-            "name": "limit",
-            "type": "number",
-            "required": false,
-            "description": "Maximum number of accounts to return per request (1-10,000)."
-          },
-          {
-            "name": "paginationKey",
-            "type": "string",
-            "required": false,
-            "description": "Base-58 encoded pagination cursor for fetching subsequent pages. Use the paginationKey from previous response."
-          },
-          {
-            "name": "changedSinceSlot",
-            "type": "number",
-            "required": false,
-            "description": "Only return accounts that were modified at or after this slot number. Useful for incremental updates."
-          },
-          {
-            "name": "filters",
-            "type": "array",
-            "required": false,
-            "description": "Powerful filtering system to efficiently query specific Solana account data patterns."
-          }
-        ]
-      },
-      "response": {
-        "kind": "json_example",
-        "value": {
-          "jsonrpc": "2.0",
-          "id": "1",
-          "result": {
-            "accounts": [
-              {
-                "pubkey": "CxELquR1gPP8wHe33gZ4QxqGB3sZ9RSwsJ2KshVewkFY",
-                "account": {
-                  "lamports": 15298080,
-                  "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
-                  "data": [
-                    "2R9jLfiAQ9bgdcw6h8s44439",
-                    "base64"
-                  ],
-                  "executable": false,
-                  "rentEpoch": 28,
-                  "space": 165
-                }
-              }
-            ],
-            "paginationKey": "8WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM",
-            "totalResults": 25000
-          }
-        }
-      },
-      "errors": [
-        {
-          "httpStatus": 400,
-          "code": -32602,
-          "message": "Invalid params",
-          "description": "Bad Request - Invalid request parameters or malformed request.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32602,
-              "message": "Invalid params",
-              "data": {}
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 401,
-          "code": -32001,
-          "message": "Unauthorized",
-          "description": "Unauthorized - Invalid or missing API key.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32001,
-              "message": "Unauthorized",
-              "data": {}
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 429,
-          "code": -32005,
-          "message": "Too many requests",
-          "description": "Too Many Requests - Rate limit exceeded.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32005,
-              "message": "Too many requests",
-              "data": {}
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 500,
-          "code": -32603,
-          "message": "Internal error",
-          "description": "Internal Server Error - An error occurred on the server.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32603,
-              "message": "Internal error",
-              "data": {}
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 503,
-          "code": -32002,
-          "message": "Service unavailable",
-          "description": "Service Unavailable - The service is temporarily unavailable.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32002,
-              "message": "Service unavailable",
-              "data": {}
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 504,
-          "code": -32003,
-          "message": "Gateway timeout",
-          "description": "Gateway Timeout - The request timed out.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32003,
-              "message": "Gateway timeout",
-              "data": {}
-            },
-            "id": "1"
-          }
-        }
-      ]
-    },
-    {
-      "method": "getSlot",
-      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getslot",
-      "schema": "known",
-      "params": {
-        "kind": "table",
-        "fields": [
-          {
-            "name": "commitment",
-            "type": "string",
-            "required": false,
-            "description": "The finality level to retrieve the slot for (processed = fastest, finalized = fully confirmed). confirmed | finalized | processed"
-          },
-          {
-            "name": "minContextSlot",
-            "type": "number",
-            "required": false,
-            "description": "Minimum Solana blockchain slot that must be reached before processing this request."
-          }
-        ]
-      },
-      "response": {
-        "kind": "json_example",
-        "value": {
-          "jsonrpc": "2.0",
-          "id": "1",
-          "result": 1234
-        }
-      },
-      "errors": [
-        {
-          "httpStatus": 400,
-          "code": -32602,
-          "message": "Invalid params",
-          "description": "Bad Request - Invalid request parameters or malformed request.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32602,
-              "message": "Invalid params"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 401,
-          "code": -32001,
-          "message": "Unauthorized",
-          "description": "Unauthorized - Invalid or missing API key.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32001,
-              "message": "Unauthorized"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 429,
-          "code": -32005,
-          "message": "Too many requests",
-          "description": "Too Many Requests - Rate limit exceeded.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32005,
-              "message": "Too many requests"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 500,
-          "code": -32603,
-          "message": "Internal error",
-          "description": "Internal Server Error - An error occurred on the server.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32603,
-              "message": "Internal error"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 503,
-          "code": -32002,
-          "message": "Service unavailable",
-          "description": "Service Unavailable - The service is temporarily unavailable.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32002,
-              "message": "Service unavailable"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 504,
-          "code": -32003,
-          "message": "Gateway timeout",
-          "description": "Gateway Timeout - The request timed out.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32003,
-              "message": "Gateway timeout"
-            },
-            "id": "1"
-          }
-        }
-      ]
-    },
-    {
-      "method": "getSlotLeader",
-      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getslotleader",
-      "schema": "known",
-      "params": {
-        "kind": "table",
-        "fields": [
-          {
-            "name": "commitment",
-            "type": "string",
-            "required": false,
-            "description": "The commitment level for the request. confirmed | finalized | processed"
-          },
-          {
-            "name": "minContextSlot",
-            "type": "number",
-            "required": false,
-            "description": "The minimum slot that the request can be evaluated at."
-          }
-        ]
-      },
-      "response": {
-        "kind": "json_example",
-        "value": {
-          "jsonrpc": "2.0",
-          "id": "1",
-          "result": "ENvAW7JScgYq6o4zKZwewtkzzJgDzuJAFxYasvmEQdpS"
-        }
-      },
-      "errors": [
-        {
-          "httpStatus": 400,
-          "code": -32602,
-          "message": "Invalid params",
-          "description": "Bad Request - Invalid request parameters or malformed request.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32602,
-              "message": "Invalid params"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 401,
-          "code": -32001,
-          "message": "Unauthorized",
-          "description": "Unauthorized - Invalid or missing API key.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32001,
-              "message": "Unauthorized"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 429,
-          "code": -32005,
-          "message": "Too many requests",
-          "description": "Too Many Requests - Rate limit exceeded.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32005,
-              "message": "Too many requests"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 500,
-          "code": -32603,
-          "message": "Internal error",
-          "description": "Internal Server Error - An error occurred on the server.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32603,
-              "message": "Internal error"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 503,
-          "code": -32002,
-          "message": "Service unavailable",
-          "description": "Service Unavailable - The service is temporarily unavailable.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32002,
-              "message": "Service unavailable"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 504,
-          "code": -32003,
-          "message": "Gateway timeout",
-          "description": "Gateway Timeout - The request timed out.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32003,
-              "message": "Gateway timeout"
-            },
-            "id": "1"
-          }
-        }
-      ]
-    },
-    {
-      "method": "getTransaction",
-      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/gettransaction",
-      "schema": "known",
-      "params": {
-        "kind": "table",
-        "fields": [
-          {
-            "name": "transaction",
-            "type": "string",
-            "required": true,
-            "description": "Solana transaction signature as a base-58 encoded string for lookup."
-          },
-          {
-            "name": "encoding",
-            "type": "string",
-            "required": true,
-            "description": "Encoding format for the returned Solana transaction data. json | jsonParsed | base64 | base58"
-          },
-          {
-            "name": "commitment",
-            "type": "string",
-            "required": false,
-            "description": "Blockchain commitment level for transaction finality verification. confirmed | finalized"
-          },
-          {
-            "name": "maxSupportedTransactionVersion",
-            "type": "number",
-            "required": false,
-            "description": "Maximum Solana transaction version to return in responses (for versioned transaction support)."
-          }
-        ]
-      },
-      "response": {
-        "kind": "json_example",
-        "value": {
-          "jsonrpc": "2.0",
-          "id": "1",
-          "result": {
-            "slot": 430,
-            "transaction": {
-              "message": {
-                "accountKeys": [
-                  "3UVYmECPPMZSCqWKfENfuoTv51fTDTWicX9xmBD2euKe"
-                ],
-                "header": {
-                  "numReadonlySignedAccounts": 0,
-                  "numReadonlyUnsignedAccounts": 3,
-                  "numRequiredSignatures": 1
-                },
-                "instructions": [
-                  {
-                    "accounts": [
-                      1
-                    ],
-                    "data": "37u9WtQpcm6ULa3WRQHmj49EPs4if7o9f1jSRVZpm2dvihR9C8jY4NqEwXUbLwx15HBSNcP1",
-                    "programIdIndex": 4
-                  }
-                ],
-                "recentBlockhash": "mfcyqEXB3DnHXki6KjjmZck6YjmZLvpAByy2fj4nh6B"
-              },
-              "signatures": [
-                "2nBhEBYYvfaAe16UMNqRHre4YNSskvuYgx3M6E4JP1oDYvZEJHvoPzyUidNgNX5r9sTyN1J9UxtbCXy2rqYcuyuv"
-              ]
-            },
-            "meta": {
-              "err": null,
-              "fee": 5000,
-              "innerInstructions": []
-            }
-          }
-        }
-      },
-      "errors": [
-        {
-          "httpStatus": 400,
-          "code": -32602,
-          "message": "Invalid params",
-          "description": "Bad Request - Invalid request parameters or malformed request.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32602,
-              "message": "Invalid params"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 401,
-          "code": -32001,
-          "message": "Unauthorized",
-          "description": "Unauthorized - Invalid or missing API key.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32001,
-              "message": "Unauthorized"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 429,
-          "code": -32005,
-          "message": "Too many requests",
-          "description": "Too Many Requests - Rate limit exceeded.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32005,
-              "message": "Too many requests"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 500,
-          "code": -32603,
-          "message": "Internal error",
-          "description": "Internal Server Error - An error occurred on the server.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32603,
-              "message": "Internal error"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 503,
-          "code": -32002,
-          "message": "Service unavailable",
-          "description": "Service Unavailable - The service is temporarily unavailable.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32002,
-              "message": "Service unavailable"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 504,
-          "code": -32003,
-          "message": "Gateway timeout",
-          "description": "Gateway Timeout - The request timed out.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32003,
-              "message": "Gateway timeout"
-            },
-            "id": "1"
-          }
-        }
-      ]
-    },
-    {
-      "method": "getTransactionCount",
-      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/gettransactioncount",
-      "schema": "known",
-      "params": {
-        "kind": "table",
-        "fields": [
-          {
-            "name": "commitment",
-            "type": "string",
-            "required": false,
-            "description": "The finality level at which to measure the transaction count (processed = recent, finalized = confirmed). confirmed | finalized | processed"
-          },
-          {
-            "name": "minContextSlot",
-            "type": "number",
-            "required": false,
-            "description": "The minimum slot that the request can be evaluated at."
-          }
-        ]
-      },
-      "response": {
-        "kind": "json_example",
-        "value": {
-          "jsonrpc": "2.0",
-          "id": "1",
-          "result": 268
-        }
-      },
-      "errors": [
-        {
-          "httpStatus": 400,
-          "code": -32602,
-          "message": "Invalid params",
-          "description": "Bad Request - Invalid request parameters or malformed request.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32602,
-              "message": "Invalid params"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 401,
-          "code": -32001,
-          "message": "Unauthorized",
-          "description": "Unauthorized - Invalid or missing API key.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32001,
-              "message": "Unauthorized"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 429,
-          "code": -32005,
-          "message": "Too many requests",
-          "description": "Too Many Requests - Rate limit exceeded.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32005,
-              "message": "Too many requests"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 500,
-          "code": -32603,
-          "message": "Internal error",
-          "description": "Internal Server Error - An error occurred on the server.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32603,
-              "message": "Internal error"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 503,
-          "code": -32002,
-          "message": "Service unavailable",
-          "description": "Service Unavailable - The service is temporarily unavailable.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32002,
-              "message": "Service unavailable"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 504,
-          "code": -32003,
-          "message": "Gateway timeout",
-          "description": "Gateway Timeout - The request timed out.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32003,
-              "message": "Gateway timeout"
-            },
-            "id": "1"
-          }
-        }
-      ]
-    },
-    {
-      "method": "getSignaturesForAddress",
-      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getsignaturesforaddress",
-      "schema": "known",
-      "params": {
-        "kind": "table",
-        "fields": [
-          {
-            "name": "address",
-            "type": "string",
-            "required": true,
-            "description": "Solana account address to retrieve transaction history for (wallet, token, program, NFT, etc.)."
-          },
-          {
-            "name": "commitment",
-            "type": "string",
-            "required": false,
-            "description": "The commitment level for the request. The processed commitment is not supported. confirmed | finalized"
-          },
-          {
-            "name": "minContextSlot",
-            "type": "number",
-            "required": false,
-            "description": "The minimum slot that the request can be evaluated at."
-          },
-          {
-            "name": "limit",
-            "type": "number",
-            "required": false,
-            "description": "Maximum number of transaction signatures to return in a single request (1-1,000)."
-          },
-          {
-            "name": "before",
-            "type": "string",
-            "required": false,
-            "description": "Pagination parameter to get transactions before this signature (earlier in time)."
-          },
-          {
-            "name": "until",
-            "type": "string",
-            "required": false,
-            "description": "Get transactions until this signature is reached, useful for specific time ranges."
-          }
-        ]
-      },
-      "response": {
-        "kind": "json_example",
-        "value": {
-          "jsonrpc": "2.0",
-          "id": 1,
-          "result": [
-            {
-              "signature": "5h6xBEauJ3PK6SWCZ1PGjBvj8vDdWG3KpwATGy1ARAXFSDwt8GFXM7W5Ncn16wmqokgpiKRLuS83KUxyZyv2sUYv",
-              "slot": 114,
-              "err": null,
-              "memo": null,
-              "blockTime": null,
-              "confirmationStatus": "finalized"
-            }
-          ]
         }
       },
       "errors": [
@@ -2578,6 +2117,965 @@
       ]
     },
     {
+      "method": "getMultipleAccounts",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getmultipleaccounts",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "address",
+            "type": "array",
+            "required": true,
+            "description": "Array of Solana account addresses (up to 100) to fetch in a single optimized batch request."
+          },
+          {
+            "name": "commitment",
+            "type": "string",
+            "required": false,
+            "description": "The commitment level for the request. confirmed | finalized | processed"
+          },
+          {
+            "name": "minContextSlot",
+            "type": "number",
+            "required": false,
+            "description": "The minimum slot that the request can be evaluated at."
+          },
+          {
+            "name": "dataSlice",
+            "type": "object",
+            "required": false,
+            "description": "Request a slice of the account's data."
+          },
+          {
+            "name": "dataSlice.length",
+            "type": "number",
+            "required": false,
+            "description": "Number of bytes to return."
+          },
+          {
+            "name": "dataSlice.offset",
+            "type": "number",
+            "required": false,
+            "description": "Byte offset from which to start reading."
+          },
+          {
+            "name": "encoding",
+            "type": "string",
+            "required": false,
+            "description": "Encoding format for the returned account data. jsonParsed | base58 | base64 | base64+zstd"
+          },
+          {
+            "name": "changedSinceSlot",
+            "type": "number",
+            "required": false,
+            "description": "Only return accounts that have been modified at or after this slot number. For accounts that exist but haven't changed since the specified slot, the response will contain status as unchanged."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "jsonrpc": "2.0",
+          "id": "1",
+          "result": {
+            "context": {
+              "apiVersion": "2.0.15",
+              "slot": 341197247
+            },
+            "value": [
+              {
+                "lamports": 88849814690250,
+                "owner": "11111111111111111111111111111111",
+                "data": [
+                  "",
+                  "base58"
+                ],
+                "executable": false,
+                "rentEpoch": 18446744073709552000,
+                "space": 0
+              },
+              {
+                "status": "unchanged"
+              },
+              null
+            ]
+          }
+        }
+      },
+      "errors": [
+        {
+          "httpStatus": 400,
+          "code": -32602,
+          "message": "Invalid params",
+          "description": "Bad Request - Invalid request parameters or malformed request.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32602,
+              "message": "Invalid params",
+              "data": {
+                "additionalInfo": "Please check the request parameters and ensure they are valid."
+              }
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 401,
+          "code": -32001,
+          "message": "Unauthorized",
+          "description": "Unauthorized - Invalid or missing API key.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32001,
+              "message": "Unauthorized",
+              "data": {
+                "additionalInfo": "Please verify your API key and try again."
+              }
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 429,
+          "code": -32005,
+          "message": "Too many requests",
+          "description": "Too Many Requests - Rate limit exceeded.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32005,
+              "message": "Too many requests",
+              "data": {
+                "additionalInfo": "You have exceeded the allowed number of requests. Please wait and try again later."
+              }
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 500,
+          "code": -32603,
+          "message": "Internal error",
+          "description": "Internal Server Error - An error occurred on the server.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32603,
+              "message": "Internal error",
+              "data": {
+                "additionalInfo": "An unexpected error occurred on the server. Please try again later or contact support."
+              }
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 503,
+          "code": -32002,
+          "message": "Service unavailable",
+          "description": "Service Unavailable - The service is temporarily unavailable.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32002,
+              "message": "Service unavailable",
+              "data": {
+                "additionalInfo": "The service is currently unavailable. Please try again later or contact support."
+              }
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 504,
+          "code": -32003,
+          "message": "Gateway timeout",
+          "description": "Gateway Timeout - The request timed out.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32003,
+              "message": "Gateway timeout",
+              "data": {
+                "additionalInfo": "The request timed out. Please try again later or contact support."
+              }
+            },
+            "id": "1"
+          }
+        }
+      ]
+    },
+    {
+      "method": "getProgramAccounts",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getprogramaccounts",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "address",
+            "type": "string",
+            "required": true,
+            "description": "The Solana program public key (address) to query accounts for, as a base-58 encoded string."
+          },
+          {
+            "name": "commitment",
+            "type": "string",
+            "required": false,
+            "description": "The commitment level for the request. confirmed | finalized | processed"
+          },
+          {
+            "name": "minContextSlot",
+            "type": "number",
+            "required": false,
+            "description": "The minimum slot that the request can be evaluated at."
+          },
+          {
+            "name": "withContext",
+            "type": "boolean",
+            "required": false,
+            "description": "Wrap the result in an RpcResponse JSON object."
+          },
+          {
+            "name": "encoding",
+            "type": "string",
+            "required": false,
+            "description": "Encoding format for the returned account data. jsonParsed | base58 | base64 | base64+zstd"
+          },
+          {
+            "name": "dataSlice",
+            "type": "object",
+            "required": false,
+            "description": "Request a slice of the account's data."
+          },
+          {
+            "name": "dataSlice.length",
+            "type": "number",
+            "required": false,
+            "description": "Number of bytes to return."
+          },
+          {
+            "name": "dataSlice.offset",
+            "type": "number",
+            "required": false,
+            "description": "Byte offset from which to start reading."
+          },
+          {
+            "name": "changedSinceSlot",
+            "type": "number",
+            "required": false,
+            "description": "Only return accounts that were modified at or after this slot number. Useful for incremental updates."
+          },
+          {
+            "name": "filters",
+            "type": "array",
+            "required": false,
+            "description": "Powerful filtering system to efficiently query specific Solana account data patterns."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "jsonrpc": "2.0",
+          "id": "1",
+          "result": [
+            {
+              "pubkey": "CxELquR1gPP8wHe33gZ4QxqGB3sZ9RSwsJ2KshVewkFY",
+              "account": {
+                "lamports": 15298080,
+                "owner": "4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T",
+                "data": [
+                  "2R9jLfiAQ9bgdcw6h8s44439",
+                  "base58"
+                ],
+                "executable": false,
+                "rentEpoch": 28,
+                "space": 42
+              }
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "httpStatus": 400,
+          "code": -32602,
+          "message": "Invalid params",
+          "description": "Bad Request - Invalid request parameters or malformed request.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32602,
+              "message": "Invalid params",
+              "data": {}
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 401,
+          "code": -32001,
+          "message": "Unauthorized",
+          "description": "Unauthorized - Invalid or missing API key.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32001,
+              "message": "Unauthorized",
+              "data": {}
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 429,
+          "code": -32005,
+          "message": "Too many requests",
+          "description": "Too Many Requests - Rate limit exceeded.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32005,
+              "message": "Too many requests",
+              "data": {}
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 500,
+          "code": -32603,
+          "message": "Internal error",
+          "description": "Internal Server Error - An error occurred on the server.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32603,
+              "message": "Internal error",
+              "data": {}
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 503,
+          "code": -32002,
+          "message": "Service unavailable",
+          "description": "Service Unavailable - The service is temporarily unavailable.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32002,
+              "message": "Service unavailable",
+              "data": {}
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 504,
+          "code": -32003,
+          "message": "Gateway timeout",
+          "description": "Gateway Timeout - The request timed out.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32003,
+              "message": "Gateway timeout",
+              "data": {}
+            },
+            "id": "1"
+          }
+        }
+      ]
+    },
+    {
+      "method": "getProgramAccountsV2",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getprogramaccountsv2",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "address",
+            "type": "string",
+            "required": true,
+            "description": "The Solana program public key (address) to query accounts for, as a base-58 encoded string."
+          },
+          {
+            "name": "commitment",
+            "type": "string",
+            "required": false,
+            "description": "The commitment level for the request. confirmed | finalized | processed"
+          },
+          {
+            "name": "minContextSlot",
+            "type": "number",
+            "required": false,
+            "description": "The minimum slot that the request can be evaluated at."
+          },
+          {
+            "name": "withContext",
+            "type": "boolean",
+            "required": false,
+            "description": "Wrap the result in an RpcResponse JSON object."
+          },
+          {
+            "name": "encoding",
+            "type": "string",
+            "required": false,
+            "description": "Encoding format for the returned account data. jsonParsed | base58 | base64 | base64+zstd"
+          },
+          {
+            "name": "dataSlice",
+            "type": "object",
+            "required": false,
+            "description": "Request a slice of the account's data."
+          },
+          {
+            "name": "dataSlice.length",
+            "type": "number",
+            "required": false,
+            "description": "Number of bytes to return."
+          },
+          {
+            "name": "dataSlice.offset",
+            "type": "number",
+            "required": false,
+            "description": "Byte offset from which to start reading."
+          },
+          {
+            "name": "limit",
+            "type": "number",
+            "required": false,
+            "description": "Maximum number of accounts to return per request (1-10,000)."
+          },
+          {
+            "name": "paginationKey",
+            "type": "string",
+            "required": false,
+            "description": "Base-58 encoded pagination cursor for fetching subsequent pages. Use the paginationKey from previous response."
+          },
+          {
+            "name": "changedSinceSlot",
+            "type": "number",
+            "required": false,
+            "description": "Only return accounts that were modified at or after this slot number. Useful for incremental updates."
+          },
+          {
+            "name": "filters",
+            "type": "array",
+            "required": false,
+            "description": "Powerful filtering system to efficiently query specific Solana account data patterns."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "jsonrpc": "2.0",
+          "id": "1",
+          "result": {
+            "accounts": [
+              {
+                "pubkey": "CxELquR1gPP8wHe33gZ4QxqGB3sZ9RSwsJ2KshVewkFY",
+                "account": {
+                  "lamports": 15298080,
+                  "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+                  "data": [
+                    "2R9jLfiAQ9bgdcw6h8s44439",
+                    "base64"
+                  ],
+                  "executable": false,
+                  "rentEpoch": 28,
+                  "space": 165
+                }
+              }
+            ],
+            "paginationKey": "8WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM",
+            "totalResults": 25000
+          }
+        }
+      },
+      "errors": [
+        {
+          "httpStatus": 400,
+          "code": -32602,
+          "message": "Invalid params",
+          "description": "Bad Request - Invalid request parameters or malformed request.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32602,
+              "message": "Invalid params",
+              "data": {}
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 401,
+          "code": -32001,
+          "message": "Unauthorized",
+          "description": "Unauthorized - Invalid or missing API key.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32001,
+              "message": "Unauthorized",
+              "data": {}
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 429,
+          "code": -32005,
+          "message": "Too many requests",
+          "description": "Too Many Requests - Rate limit exceeded.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32005,
+              "message": "Too many requests",
+              "data": {}
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 500,
+          "code": -32603,
+          "message": "Internal error",
+          "description": "Internal Server Error - An error occurred on the server.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32603,
+              "message": "Internal error",
+              "data": {}
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 503,
+          "code": -32002,
+          "message": "Service unavailable",
+          "description": "Service Unavailable - The service is temporarily unavailable.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32002,
+              "message": "Service unavailable",
+              "data": {}
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 504,
+          "code": -32003,
+          "message": "Gateway timeout",
+          "description": "Gateway Timeout - The request timed out.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32003,
+              "message": "Gateway timeout",
+              "data": {}
+            },
+            "id": "1"
+          }
+        }
+      ]
+    },
+    {
+      "method": "getSignaturesForAddress",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getsignaturesforaddress",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "address",
+            "type": "string",
+            "required": true,
+            "description": "Solana account address to retrieve transaction history for (wallet, token, program, NFT, etc.)."
+          },
+          {
+            "name": "commitment",
+            "type": "string",
+            "required": false,
+            "description": "The commitment level for the request. The processed commitment is not supported. confirmed | finalized"
+          },
+          {
+            "name": "minContextSlot",
+            "type": "number",
+            "required": false,
+            "description": "The minimum slot that the request can be evaluated at."
+          },
+          {
+            "name": "limit",
+            "type": "number",
+            "required": false,
+            "description": "Maximum number of transaction signatures to return in a single request (1-1,000)."
+          },
+          {
+            "name": "before",
+            "type": "string",
+            "required": false,
+            "description": "Pagination parameter to get transactions before this signature (earlier in time)."
+          },
+          {
+            "name": "until",
+            "type": "string",
+            "required": false,
+            "description": "Get transactions until this signature is reached, useful for specific time ranges."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "result": [
+            {
+              "signature": "5h6xBEauJ3PK6SWCZ1PGjBvj8vDdWG3KpwATGy1ARAXFSDwt8GFXM7W5Ncn16wmqokgpiKRLuS83KUxyZyv2sUYv",
+              "slot": 114,
+              "err": null,
+              "memo": null,
+              "blockTime": null,
+              "confirmationStatus": "finalized"
+            }
+          ]
+        }
+      },
+      "errors": [
+        {
+          "httpStatus": 400,
+          "code": -32602,
+          "message": "Invalid params",
+          "description": "Bad Request - Invalid request parameters or malformed request.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32602,
+              "message": "Invalid params"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 401,
+          "code": -32001,
+          "message": "Unauthorized",
+          "description": "Unauthorized - Invalid or missing API key.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32001,
+              "message": "Unauthorized"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 429,
+          "code": -32005,
+          "message": "Too many requests",
+          "description": "Too Many Requests - Rate limit exceeded.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32005,
+              "message": "Too many requests"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 500,
+          "code": -32603,
+          "message": "Internal error",
+          "description": "Internal Server Error - An error occurred on the server.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32603,
+              "message": "Internal error"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 503,
+          "code": -32002,
+          "message": "Service unavailable",
+          "description": "Service Unavailable - The service is temporarily unavailable.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32002,
+              "message": "Service unavailable"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 504,
+          "code": -32003,
+          "message": "Gateway timeout",
+          "description": "Gateway Timeout - The request timed out.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32003,
+              "message": "Gateway timeout"
+            },
+            "id": "1"
+          }
+        }
+      ]
+    },
+    {
+      "method": "getSlot",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getslot",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "commitment",
+            "type": "string",
+            "required": false,
+            "description": "The finality level to retrieve the slot for (processed = fastest, finalized = fully confirmed). confirmed | finalized | processed"
+          },
+          {
+            "name": "minContextSlot",
+            "type": "number",
+            "required": false,
+            "description": "Minimum Solana blockchain slot that must be reached before processing this request."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "jsonrpc": "2.0",
+          "id": "1",
+          "result": 1234
+        }
+      },
+      "errors": [
+        {
+          "httpStatus": 400,
+          "code": -32602,
+          "message": "Invalid params",
+          "description": "Bad Request - Invalid request parameters or malformed request.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32602,
+              "message": "Invalid params"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 401,
+          "code": -32001,
+          "message": "Unauthorized",
+          "description": "Unauthorized - Invalid or missing API key.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32001,
+              "message": "Unauthorized"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 429,
+          "code": -32005,
+          "message": "Too many requests",
+          "description": "Too Many Requests - Rate limit exceeded.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32005,
+              "message": "Too many requests"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 500,
+          "code": -32603,
+          "message": "Internal error",
+          "description": "Internal Server Error - An error occurred on the server.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32603,
+              "message": "Internal error"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 503,
+          "code": -32002,
+          "message": "Service unavailable",
+          "description": "Service Unavailable - The service is temporarily unavailable.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32002,
+              "message": "Service unavailable"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 504,
+          "code": -32003,
+          "message": "Gateway timeout",
+          "description": "Gateway Timeout - The request timed out.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32003,
+              "message": "Gateway timeout"
+            },
+            "id": "1"
+          }
+        }
+      ]
+    },
+    {
+      "method": "getSlotLeader",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getslotleader",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "commitment",
+            "type": "string",
+            "required": false,
+            "description": "The commitment level for the request. confirmed | finalized | processed"
+          },
+          {
+            "name": "minContextSlot",
+            "type": "number",
+            "required": false,
+            "description": "The minimum slot that the request can be evaluated at."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "jsonrpc": "2.0",
+          "id": "1",
+          "result": "ENvAW7JScgYq6o4zKZwewtkzzJgDzuJAFxYasvmEQdpS"
+        }
+      },
+      "errors": [
+        {
+          "httpStatus": 400,
+          "code": -32602,
+          "message": "Invalid params",
+          "description": "Bad Request - Invalid request parameters or malformed request.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32602,
+              "message": "Invalid params"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 401,
+          "code": -32001,
+          "message": "Unauthorized",
+          "description": "Unauthorized - Invalid or missing API key.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32001,
+              "message": "Unauthorized"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 429,
+          "code": -32005,
+          "message": "Too many requests",
+          "description": "Too Many Requests - Rate limit exceeded.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32005,
+              "message": "Too many requests"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 500,
+          "code": -32603,
+          "message": "Internal error",
+          "description": "Internal Server Error - An error occurred on the server.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32603,
+              "message": "Internal error"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 503,
+          "code": -32002,
+          "message": "Service unavailable",
+          "description": "Service Unavailable - The service is temporarily unavailable.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32002,
+              "message": "Service unavailable"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 504,
+          "code": -32003,
+          "message": "Gateway timeout",
+          "description": "Gateway Timeout - The request timed out.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32003,
+              "message": "Gateway timeout"
+            },
+            "id": "1"
+          }
+        }
+      ]
+    },
+    {
       "method": "getTokenAccountBalance",
       "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/gettokenaccountbalance",
       "schema": "known",
@@ -3318,6 +3816,1181 @@
       ]
     },
     {
+      "method": "getTransaction",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/gettransaction",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "transaction",
+            "type": "string",
+            "required": true,
+            "description": "Solana transaction signature as a base-58 encoded string for lookup."
+          },
+          {
+            "name": "encoding",
+            "type": "string",
+            "required": true,
+            "description": "Encoding format for the returned Solana transaction data. json | jsonParsed | base64 | base58"
+          },
+          {
+            "name": "commitment",
+            "type": "string",
+            "required": false,
+            "description": "Blockchain commitment level for transaction finality verification. confirmed | finalized"
+          },
+          {
+            "name": "maxSupportedTransactionVersion",
+            "type": "number",
+            "required": false,
+            "description": "Maximum Solana transaction version to return in responses (for versioned transaction support)."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "jsonrpc": "2.0",
+          "id": "1",
+          "result": {
+            "slot": 430,
+            "transaction": {
+              "message": {
+                "accountKeys": [
+                  "3UVYmECPPMZSCqWKfENfuoTv51fTDTWicX9xmBD2euKe"
+                ],
+                "header": {
+                  "numReadonlySignedAccounts": 0,
+                  "numReadonlyUnsignedAccounts": 3,
+                  "numRequiredSignatures": 1
+                },
+                "instructions": [
+                  {
+                    "accounts": [
+                      1
+                    ],
+                    "data": "37u9WtQpcm6ULa3WRQHmj49EPs4if7o9f1jSRVZpm2dvihR9C8jY4NqEwXUbLwx15HBSNcP1",
+                    "programIdIndex": 4
+                  }
+                ],
+                "recentBlockhash": "mfcyqEXB3DnHXki6KjjmZck6YjmZLvpAByy2fj4nh6B"
+              },
+              "signatures": [
+                "2nBhEBYYvfaAe16UMNqRHre4YNSskvuYgx3M6E4JP1oDYvZEJHvoPzyUidNgNX5r9sTyN1J9UxtbCXy2rqYcuyuv"
+              ]
+            },
+            "meta": {
+              "err": null,
+              "fee": 5000,
+              "innerInstructions": []
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "httpStatus": 400,
+          "code": -32602,
+          "message": "Invalid params",
+          "description": "Bad Request - Invalid request parameters or malformed request.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32602,
+              "message": "Invalid params"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 401,
+          "code": -32001,
+          "message": "Unauthorized",
+          "description": "Unauthorized - Invalid or missing API key.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32001,
+              "message": "Unauthorized"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 429,
+          "code": -32005,
+          "message": "Too many requests",
+          "description": "Too Many Requests - Rate limit exceeded.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32005,
+              "message": "Too many requests"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 500,
+          "code": -32603,
+          "message": "Internal error",
+          "description": "Internal Server Error - An error occurred on the server.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32603,
+              "message": "Internal error"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 503,
+          "code": -32002,
+          "message": "Service unavailable",
+          "description": "Service Unavailable - The service is temporarily unavailable.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32002,
+              "message": "Service unavailable"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 504,
+          "code": -32003,
+          "message": "Gateway timeout",
+          "description": "Gateway Timeout - The request timed out.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32003,
+              "message": "Gateway timeout"
+            },
+            "id": "1"
+          }
+        }
+      ]
+    },
+    {
+      "method": "getTransactionCount",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/gettransactioncount",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "commitment",
+            "type": "string",
+            "required": false,
+            "description": "The finality level at which to measure the transaction count (processed = recent, finalized = confirmed). confirmed | finalized | processed"
+          },
+          {
+            "name": "minContextSlot",
+            "type": "number",
+            "required": false,
+            "description": "The minimum slot that the request can be evaluated at."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "jsonrpc": "2.0",
+          "id": "1",
+          "result": 268
+        }
+      },
+      "errors": [
+        {
+          "httpStatus": 400,
+          "code": -32602,
+          "message": "Invalid params",
+          "description": "Bad Request - Invalid request parameters or malformed request.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32602,
+              "message": "Invalid params"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 401,
+          "code": -32001,
+          "message": "Unauthorized",
+          "description": "Unauthorized - Invalid or missing API key.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32001,
+              "message": "Unauthorized"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 429,
+          "code": -32005,
+          "message": "Too many requests",
+          "description": "Too Many Requests - Rate limit exceeded.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32005,
+              "message": "Too many requests"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 500,
+          "code": -32603,
+          "message": "Internal error",
+          "description": "Internal Server Error - An error occurred on the server.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32603,
+              "message": "Internal error"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 503,
+          "code": -32002,
+          "message": "Service unavailable",
+          "description": "Service Unavailable - The service is temporarily unavailable.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32002,
+              "message": "Service unavailable"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 504,
+          "code": -32003,
+          "message": "Gateway timeout",
+          "description": "Gateway Timeout - The request timed out.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32003,
+              "message": "Gateway timeout"
+            },
+            "id": "1"
+          }
+        }
+      ]
+    },
+    {
+      "method": "getWalletBalances",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/wallet-api/get-wallet-balances",
+      "category": "wallet-api",
+      "transport": "http",
+      "http": {
+        "method": "GET",
+        "path": "/v1/wallet/{wallet}/balances",
+        "mainnetBaseUrl": "https://api.helius.xyz"
+      },
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "string",
+            "required": true,
+            "description": "Solana wallet address (base58 encoded)."
+          },
+          {
+            "name": "page",
+            "type": "number",
+            "required": false,
+            "description": "Page number for pagination (1-indexed). Default: 1."
+          },
+          {
+            "name": "limit",
+            "type": "number",
+            "required": false,
+            "description": "Maximum number of tokens per page. Range: 1-100. Default: 100."
+          },
+          {
+            "name": "showZeroBalance",
+            "type": "boolean",
+            "required": false,
+            "description": "Include tokens with zero balance. Default: false."
+          },
+          {
+            "name": "showNative",
+            "type": "boolean",
+            "required": false,
+            "description": "Include native SOL in results. Default: true."
+          },
+          {
+            "name": "showNfts",
+            "type": "boolean",
+            "required": false,
+            "description": "Include NFTs in results (max 100, first page only). Default: false."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "balances": [
+            {
+              "mint": "So11111111111111111111111111111111111111112",
+              "symbol": "SOL",
+              "name": "Solana",
+              "balance": 1.5,
+              "decimals": 9,
+              "pricePerToken": 145.32,
+              "usdValue": 217.98,
+              "logoUri": "https://example.com/sol-logo.png",
+              "tokenProgram": "spl-token"
+            }
+          ],
+          "nfts": [
+            {
+              "mint": "7Xq8wXyXVqfBPPqVJjPDwG9zN5wCVxBYZ6z7vPYBzr6F",
+              "name": "Degen Ape",
+              "imageUri": "https://example.com/nft.png",
+              "collectionName": "Degen Ape Academy",
+              "collectionAddress": "DegN1dXmU2uYa4n7U9qTh7YNYpK4u8L9qXx7XqYqJfGH",
+              "compressed": false
+            }
+          ],
+          "totalUsdValue": 217.98,
+          "pagination": {
+            "page": 1,
+            "limit": 100,
+            "hasMore": true
+          }
+        }
+      },
+      "errors": [
+        {
+          "httpStatus": 400,
+          "message": "Invalid wallet address",
+          "description": "Invalid request parameters",
+          "example": {
+            "error": "Invalid wallet address",
+            "code": 400,
+            "details": "\"invalid-address\" is not a valid Solana address"
+          }
+        },
+        {
+          "httpStatus": 401,
+          "message": "API key required",
+          "description": "Missing or invalid API key",
+          "example": {
+            "error": "API key required. Pass via ?api-key=xxx or X-Api-Key header",
+            "code": 401
+          }
+        }
+      ]
+    },
+    {
+      "method": "getWalletFundingSource",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/wallet-api/get-wallet-funding",
+      "category": "wallet-api",
+      "transport": "http",
+      "http": {
+        "method": "GET",
+        "path": "/v1/wallet/{wallet}/funded-by",
+        "mainnetBaseUrl": "https://api.helius.xyz"
+      },
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "string",
+            "required": true,
+            "description": "Solana wallet address (base58 encoded)."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "funder": "2ojv9BAiHUrvsm9gxDe7fJSzbNZSJcxZvf8dqmWGHG8S",
+          "funderName": "Coinbase 2",
+          "funderType": "exchange",
+          "mint": "So11111111111111111111111111111111111111112",
+          "symbol": "SOL",
+          "amount": 0.05,
+          "amountRaw": "50000000",
+          "decimals": 9,
+          "signature": "5wHu1qwD7Jsj3xqWjdSEJmYr3Q5f5RjXqjqQJ7jqEj7jqEj7jqEj7jqEj7jqEj7jqE",
+          "timestamp": 1704067200,
+          "date": "2024-01-01T00:00:00.000Z",
+          "slot": 250000000,
+          "explorerUrl": "https://orbmarkets.io/tx/5wHu1qwD7Jsj3xqWjdSEJmYr3Q5f5RjXqjqQJ7jqEj7jqEj7jqEj7jqEj7jqEj7jqE"
+        }
+      },
+      "errors": [
+        {
+          "httpStatus": 400,
+          "message": "Invalid request parameters",
+          "description": "Invalid request parameters",
+          "example": {
+            "error": "Invalid wallet address",
+            "code": 400,
+            "details": "\"invalid-address\" is not a valid Solana address"
+          }
+        },
+        {
+          "httpStatus": 401,
+          "message": "API key required",
+          "description": "Missing or invalid API key",
+          "example": {
+            "error": "API key required. Pass via ?api-key=xxx or X-Api-Key header",
+            "code": 401
+          }
+        },
+        {
+          "httpStatus": 404,
+          "message": "No funding transaction found",
+          "description": "No funding transaction found",
+          "example": {
+            "error": "No funding transaction found",
+            "code": 404
+          }
+        }
+      ]
+    },
+    {
+      "method": "getWalletHistory",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/wallet-api/get-wallet-history",
+      "category": "wallet-api",
+      "transport": "http",
+      "http": {
+        "method": "GET",
+        "path": "/v1/wallet/{wallet}/history",
+        "mainnetBaseUrl": "https://api.helius.xyz"
+      },
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "string",
+            "required": true,
+            "description": "Solana wallet address (base58 encoded)."
+          },
+          {
+            "name": "limit",
+            "type": "number",
+            "required": false,
+            "description": "Maximum number of transactions per request. Range: 1-100. Default: 100."
+          },
+          {
+            "name": "before",
+            "type": "string",
+            "required": false,
+            "description": "Fetch transactions before this signature (use pagination.nextCursor from previous response)."
+          },
+          {
+            "name": "after",
+            "type": "string",
+            "required": false,
+            "description": "Fetch transactions after this signature (for ascending order pagination)."
+          },
+          {
+            "name": "type",
+            "type": "string",
+            "required": false,
+            "description": "Filter by transaction type (e.g. SWAP, TRANSFER, NFT_SALE, TOKEN_MINT, COMPRESSED_NFT_TRANSFER, etc.)."
+          },
+          {
+            "name": "tokenAccounts",
+            "type": "string",
+            "required": false,
+            "description": "Filter token-account related activity: none | balanceChanged | all. Default: balanceChanged."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "data": [
+            {
+              "signature": "5wHu1qwD7Jsj3xqWjdSEJmYr3Q5f5RjXqjqQJ7jqEj7jqEj7jqEj7jqEj7jqEj7jqE",
+              "timestamp": 1704067200,
+              "slot": 250000000,
+              "fee": 0.000005,
+              "feePayer": "GQUtvPx89ZNCwmvQqFmH59bJcU8fW8siETpaxod7Aydz",
+              "error": null,
+              "balanceChanges": [
+                {
+                  "mint": "So11111111111111111111111111111111111111112",
+                  "amount": -0.05,
+                  "decimals": 9
+                }
+              ]
+            }
+          ],
+          "pagination": {
+            "hasMore": true,
+            "nextCursor": "5wHu1qwD7Jsj3xqWjdSEJmYr3Q5f5RjXqjqQJ7jqEj7jqEj7jqEj7jqEj7jqEj7jqE"
+          }
+        }
+      },
+      "errors": [
+        {
+          "httpStatus": 400,
+          "message": "Invalid request parameters",
+          "description": "Invalid request parameters",
+          "example": {
+            "error": "Invalid wallet address",
+            "code": 400,
+            "details": "\"invalid-address\" is not a valid Solana address"
+          }
+        },
+        {
+          "httpStatus": 401,
+          "message": "API key required",
+          "description": "Missing or invalid API key",
+          "example": {
+            "error": "API key required. Pass via ?api-key=xxx or X-Api-Key header",
+            "code": 401
+          }
+        }
+      ]
+    },
+    {
+      "method": "getWalletIdentity",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/wallet-api/get-wallet-identity",
+      "category": "wallet-api",
+      "transport": "http",
+      "http": {
+        "method": "GET",
+        "path": "/v1/wallet/{wallet}/identity",
+        "mainnetBaseUrl": "https://api.helius.xyz"
+      },
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "string",
+            "required": true,
+            "description": "Solana wallet address (base58 encoded)."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "address": "HXsKP7wrBWaQ8T2Vtjry3Nj3oUgwYcqq9vrHDM12G664",
+          "type": "exchange",
+          "name": "Binance 1",
+          "category": "Centralized Exchange",
+          "tags": [
+            "Centralized Exchange"
+          ]
+        }
+      },
+      "errors": [
+        {
+          "httpStatus": 400,
+          "message": "Invalid wallet address",
+          "description": "Invalid request parameters",
+          "example": {
+            "error": "Invalid wallet address",
+            "code": 400,
+            "details": "\"invalid-address\" is not a valid Solana address"
+          }
+        },
+        {
+          "httpStatus": 401,
+          "message": "API key required",
+          "description": "Missing or invalid API key",
+          "example": {
+            "error": "API key required. Pass via ?api-key=xxx or X-Api-Key header",
+            "code": 401
+          }
+        },
+        {
+          "httpStatus": 404,
+          "message": "No identity information available",
+          "description": "No identity information available for this address",
+          "example": {
+            "error": "No identity information available for this address",
+            "code": 404
+          }
+        }
+      ]
+    },
+    {
+      "method": "getWalletTransfers",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/wallet-api/get-wallet-transfers",
+      "category": "wallet-api",
+      "transport": "http",
+      "http": {
+        "method": "GET",
+        "path": "/v1/wallet/{wallet}/transfers",
+        "mainnetBaseUrl": "https://api.helius.xyz"
+      },
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "string",
+            "required": true,
+            "description": "Solana wallet address (base58 encoded)."
+          },
+          {
+            "name": "limit",
+            "type": "number",
+            "required": false,
+            "description": "Maximum number of transfers to return. Range: 1-100. Default: 50."
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "required": false,
+            "description": "Pagination cursor from previous response."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "data": [
+            {
+              "signature": "5wHu1qwD7Jsj3xqWjdSEJmYr3Q5f5RjXqjqQJ7jqEj7jqEj7jqEj7jqEj7jqEj7jqE",
+              "timestamp": 1704067200,
+              "direction": "in",
+              "counterparty": "HXsKP7wrBWaQ8T2Vtjry3Nj3oUgwYcqq9vrHDM12G664",
+              "mint": "So11111111111111111111111111111111111111112",
+              "symbol": "SOL",
+              "amount": 1.5,
+              "amountRaw": "1500000000",
+              "decimals": 9
+            }
+          ],
+          "pagination": {
+            "hasMore": true,
+            "nextCursor": "5wHu1qwD7Jsj3xqWjdSEJmYr3Q5f5RjXqjqQJ7jqEj7jqEj7jqEj7jqEj7jqEj7jqE"
+          }
+        }
+      },
+      "errors": [
+        {
+          "httpStatus": 400,
+          "message": "Invalid request parameters",
+          "description": "Invalid request parameters",
+          "example": {
+            "error": "Invalid wallet address",
+            "code": 400,
+            "details": "\"invalid-address\" is not a valid Solana address"
+          }
+        },
+        {
+          "httpStatus": 401,
+          "message": "API key required",
+          "description": "Missing or invalid API key",
+          "example": {
+            "error": "API key required. Pass via ?api-key=xxx or X-Api-Key header",
+            "code": 401
+          }
+        }
+      ]
+    },
+    {
+      "method": "Log Output",
+      "docsUrl": "#custom/log-output",
+      "category": "custom",
+      "transport": "custom",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "value",
+            "type": "any",
+            "required": true,
+            "description": "Any value to output. Use a reference to print prior node results (console.log-style)."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "message": "Outputs the provided value as this node result."
+        }
+      },
+      "errors": []
+    },
+    {
+      "method": "requestAirdrop",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/requestairdrop",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "address",
+            "type": "string",
+            "required": true,
+            "description": "Solana wallet address (public key) to receive the airdrop of test SOL tokens."
+          },
+          {
+            "name": "value",
+            "type": "number",
+            "required": true,
+            "description": "Amount of SOL to airdrop in lamports (1 SOL = 1,000,000,000 lamports) for testing."
+          },
+          {
+            "name": "commitment",
+            "type": "string",
+            "required": false,
+            "description": "The commitment level for the request. confirmed | finalized | processed"
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "jsonrpc": "2.0",
+          "id": "1",
+          "result": "5VERv8NMvzbJMEkV8xnrLkEaWRtSz9CosKDYjCJjBRnbJLgp8uirBgmQpjKhoR4tjF3ZpRzrFmBV6UjKdiSZkQUW"
+        }
+      },
+      "errors": [
+        {
+          "httpStatus": 400,
+          "code": -32602,
+          "message": "Invalid params",
+          "description": "Bad Request - Invalid request parameters or malformed request.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32602,
+              "message": "Invalid params"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 401,
+          "code": -32001,
+          "message": "Unauthorized",
+          "description": "Unauthorized - Invalid or missing API key.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32001,
+              "message": "Unauthorized"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 429,
+          "code": -32005,
+          "message": "Too many requests",
+          "description": "Too Many Requests - Rate limit exceeded.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32005,
+              "message": "Too many requests"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 500,
+          "code": -32603,
+          "message": "Internal error",
+          "description": "Internal Server Error - An error occurred on the server.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32603,
+              "message": "Internal error"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 503,
+          "code": -32002,
+          "message": "Service unavailable",
+          "description": "Service Unavailable - The service is temporarily unavailable.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32002,
+              "message": "Service unavailable"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 504,
+          "code": -32003,
+          "message": "Gateway timeout",
+          "description": "Gateway Timeout - The request timed out.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32003,
+              "message": "Gateway timeout"
+            },
+            "id": "1"
+          }
+        }
+      ]
+    },
+    {
+      "method": "searchAssets",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/das/searchassets",
+      "category": "digital-asset-standard-das",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "ownerAddress",
+            "type": "string",
+            "required": false,
+            "description": "Wallet address to filter owned assets."
+          },
+          {
+            "name": "tokenType",
+            "type": "string",
+            "required": true,
+            "description": "Token type filter: fungible | nonFungible | regularNft | compressedNft | all."
+          },
+          {
+            "name": "page",
+            "type": "number",
+            "required": false,
+            "description": "Page of results to return."
+          },
+          {
+            "name": "authorityAddress",
+            "type": "string",
+            "required": false,
+            "description": "Authority address criteria for filtering assets."
+          },
+          {
+            "name": "limit",
+            "type": "number",
+            "required": false,
+            "description": "Maximum number of assets to return."
+          },
+          {
+            "name": "sortBy",
+            "type": "object",
+            "required": false,
+            "description": "Sorting options for the response."
+          },
+          {
+            "name": "sortBy.sortBy",
+            "type": "string",
+            "required": false,
+            "description": "Sort criteria: created | recent_action | updated | none."
+          },
+          {
+            "name": "sortBy.sortDirection",
+            "type": "string",
+            "required": false,
+            "description": "Sort direction: asc | desc."
+          },
+          {
+            "name": "compressed",
+            "type": "boolean",
+            "required": false,
+            "description": "Filter for compressed NFTs."
+          },
+          {
+            "name": "compressible",
+            "type": "boolean",
+            "required": false,
+            "description": "Filter for compressible assets."
+          },
+          {
+            "name": "delegate",
+            "type": "number",
+            "required": false,
+            "description": "Delegate criteria for the asset search."
+          },
+          {
+            "name": "creatorAddress",
+            "type": "string",
+            "required": false,
+            "description": "Creator address criteria."
+          },
+          {
+            "name": "creatorVerified",
+            "type": "boolean",
+            "required": false,
+            "description": "Whether creator is verified."
+          },
+          {
+            "name": "grouping",
+            "type": "array",
+            "required": false,
+            "description": "Grouping filter array, e.g. [\"collection\",\"<collectionKey>\"]."
+          },
+          {
+            "name": "tree",
+            "type": "string",
+            "required": false,
+            "description": "Merkle tree address for compressed NFT filtering."
+          },
+          {
+            "name": "supply",
+            "type": "number",
+            "required": false,
+            "description": "Supply criteria."
+          },
+          {
+            "name": "supplyMint",
+            "type": "string",
+            "required": false,
+            "description": "Supply mint criteria."
+          },
+          {
+            "name": "frozen",
+            "type": "boolean",
+            "required": false,
+            "description": "Whether asset is frozen."
+          },
+          {
+            "name": "burnt",
+            "type": "boolean",
+            "required": false,
+            "description": "Whether asset is burnt."
+          },
+          {
+            "name": "interface",
+            "type": "string",
+            "required": false,
+            "description": "Interface type filter (V1_NFT, ProgrammableNFT, FungibleToken, etc.)."
+          },
+          {
+            "name": "royaltyTargetType",
+            "type": "string",
+            "required": false,
+            "description": "Royalty target type criteria."
+          },
+          {
+            "name": "royaltyTarget",
+            "type": "number",
+            "required": false,
+            "description": "Royalty target criteria."
+          },
+          {
+            "name": "royaltyAmount",
+            "type": "number",
+            "required": false,
+            "description": "Royalty amount criteria."
+          },
+          {
+            "name": "ownerType",
+            "type": "number",
+            "required": false,
+            "description": "Ownership model criteria."
+          },
+          {
+            "name": "before",
+            "type": "string",
+            "required": false,
+            "description": "Cursor for paginating backward."
+          },
+          {
+            "name": "after",
+            "type": "string",
+            "required": false,
+            "description": "Cursor for paginating forward."
+          },
+          {
+            "name": "options",
+            "type": "object",
+            "required": false,
+            "description": "Advanced display options for search response."
+          },
+          {
+            "name": "options.showUnverifiedCollections",
+            "type": "boolean",
+            "required": false,
+            "description": "Show unverified collections. Default: false."
+          },
+          {
+            "name": "options.showCollectionMetadata",
+            "type": "boolean",
+            "required": false,
+            "description": "Show collection metadata. Default: false."
+          },
+          {
+            "name": "options.showGrandTotal",
+            "type": "boolean",
+            "required": false,
+            "description": "Show total number of matches (slower). Default: false."
+          },
+          {
+            "name": "options.showNativeBalance",
+            "type": "boolean",
+            "required": false,
+            "description": "Show owner native SOL balance. Default: false."
+          },
+          {
+            "name": "options.showInscription",
+            "type": "boolean",
+            "required": false,
+            "description": "Display inscription details. Default: false."
+          },
+          {
+            "name": "options.showZeroBalance",
+            "type": "boolean",
+            "required": false,
+            "description": "Display assets with zero balance. Default: false."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "jsonrpc": "2.0",
+          "id": "my-id",
+          "result": {
+            "assets": {
+              "last_indexed_slot": 365750752,
+              "total": 80,
+              "limit": 50,
+              "page": 1,
+              "items": [
+                {
+                  "interface": "V1_NFT",
+                  "id": "SomeNftMintKey12345",
+                  "ownership": {
+                    "owner": "86xCnPeV69n6t3DnyGvkKobf9FdN2H9oiVDdaMpo2MMY",
+                    "ownership_model": "single"
+                  },
+                  "content": {
+                    "json_uri": "https://example.com/metadata/12345.json"
+                  }
+                }
+              ]
+            },
+            "nativeBalance": {
+              "lamports": 1000000000,
+              "price_per_sol": 100,
+              "total_price": 100
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "httpStatus": 400,
+          "code": -32602,
+          "message": "Invalid request parameters.",
+          "description": "Bad Request - invalid syntax or parameters.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32602,
+              "message": "Invalid request parameters."
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 401,
+          "code": -32001,
+          "message": "Authentication failed. Missing or invalid API key.",
+          "description": "Unauthorized - missing or invalid API key.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32001,
+              "message": "Authentication failed. Missing or invalid API key."
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 403,
+          "code": -32003,
+          "message": "You do not have permission to access this resource.",
+          "description": "Forbidden.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32003,
+              "message": "You do not have permission to access this resource."
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 404,
+          "code": -32004,
+          "message": "No assets found matching the search criteria.",
+          "description": "Not Found.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32004,
+              "message": "No assets found matching the search criteria."
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 429,
+          "code": -32029,
+          "message": "Rate limit exceeded. Please try again later.",
+          "description": "Too Many Requests.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32029,
+              "message": "Rate limit exceeded. Please try again later."
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 500,
+          "code": -32000,
+          "message": "An unexpected error occurred on the server.",
+          "description": "Internal Server Error.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32000,
+              "message": "An unexpected error occurred on the server."
+            },
+            "id": "1"
+          }
+        }
+      ]
+    },
+    {
       "method": "sendTransaction",
       "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/sendtransaction",
       "schema": "known",
@@ -3561,128 +5234,6 @@
               "unitsConsumed": 1714
             }
           }
-        }
-      },
-      "errors": [
-        {
-          "httpStatus": 400,
-          "code": -32602,
-          "message": "Invalid params",
-          "description": "Bad Request - Invalid request parameters or malformed request.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32602,
-              "message": "Invalid params"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 401,
-          "code": -32001,
-          "message": "Unauthorized",
-          "description": "Unauthorized - Invalid or missing API key.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32001,
-              "message": "Unauthorized"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 429,
-          "code": -32005,
-          "message": "Too many requests",
-          "description": "Too Many Requests - Rate limit exceeded.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32005,
-              "message": "Too many requests"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 500,
-          "code": -32603,
-          "message": "Internal error",
-          "description": "Internal Server Error - An error occurred on the server.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32603,
-              "message": "Internal error"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 503,
-          "code": -32002,
-          "message": "Service unavailable",
-          "description": "Service Unavailable - The service is temporarily unavailable.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32002,
-              "message": "Service unavailable"
-            },
-            "id": "1"
-          }
-        },
-        {
-          "httpStatus": 504,
-          "code": -32003,
-          "message": "Gateway timeout",
-          "description": "Gateway Timeout - The request timed out.",
-          "example": {
-            "jsonrpc": "2.0",
-            "error": {
-              "code": -32003,
-              "message": "Gateway timeout"
-            },
-            "id": "1"
-          }
-        }
-      ]
-    },
-    {
-      "method": "requestAirdrop",
-      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/requestairdrop",
-      "schema": "known",
-      "params": {
-        "kind": "table",
-        "fields": [
-          {
-            "name": "address",
-            "type": "string",
-            "required": true,
-            "description": "Solana wallet address (public key) to receive the airdrop of test SOL tokens."
-          },
-          {
-            "name": "value",
-            "type": "number",
-            "required": true,
-            "description": "Amount of SOL to airdrop in lamports (1 SOL = 1,000,000,000 lamports) for testing."
-          },
-          {
-            "name": "commitment",
-            "type": "string",
-            "required": false,
-            "description": "The commitment level for the request. confirmed | finalized | processed"
-          }
-        ]
-      },
-      "response": {
-        "kind": "json_example",
-        "value": {
-          "jsonrpc": "2.0",
-          "id": "1",
-          "result": "5VERv8NMvzbJMEkV8xnrLkEaWRtSz9CosKDYjCJjBRnbJLgp8uirBgmQpjKhoR4tjF3ZpRzrFmBV6UjKdiSZkQUW"
         }
       },
       "errors": [
