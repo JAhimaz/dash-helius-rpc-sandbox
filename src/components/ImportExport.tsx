@@ -6,6 +6,7 @@ import { FileDown, FileUp } from "lucide-react";
 import { formatZodError, parseWorkflowImport, type WorkflowExport } from "@/lib/workflowSchema";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { QuickTooltip } from "@/components/ui/quick-tooltip";
 
 interface ImportExportProps {
   includeOutputs: boolean;
@@ -72,26 +73,28 @@ export function ImportExport({
         Include outputs in export
       </label>
 
-      <Button
-        size="sm"
-        className="h-8 w-8 p-0"
-        variant="outline"
-        onClick={exportWorkflow}
-        title="Export workflow"
-        aria-label="Export workflow"
-      >
-        <FileUp className="h-3.5 w-3.5" />
-      </Button>
-      <Button
-        size="sm"
-        className="h-8 w-8 p-0"
-        variant="outline"
-        onClick={() => fileInputRef.current?.click()}
-        title="Import workflow"
-        aria-label="Import workflow"
-      >
-        <FileDown className="h-3.5 w-3.5" />
-      </Button>
+      <QuickTooltip content="Export workflow">
+        <Button
+          size="sm"
+          className="h-8 w-8 p-0"
+          variant="outline"
+          onClick={exportWorkflow}
+          aria-label="Export workflow"
+        >
+          <FileUp className="h-3.5 w-3.5" />
+        </Button>
+      </QuickTooltip>
+      <QuickTooltip content="Import workflow">
+        <Button
+          size="sm"
+          className="h-8 w-8 p-0"
+          variant="outline"
+          onClick={() => fileInputRef.current?.click()}
+          aria-label="Import workflow"
+        >
+          <FileDown className="h-3.5 w-3.5" />
+        </Button>
+      </QuickTooltip>
 
       <input
         ref={fileInputRef}

@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { ArrowDown, Link2, Map as MapIcon, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { QuickTooltip } from "@/components/ui/quick-tooltip";
 import type { WorkflowNode } from "@/store/workflowStore";
 
 interface NodeMapModalProps {
@@ -83,16 +84,17 @@ export function NodeMapModal({ open, nodes, onClose }: NodeMapModalProps) {
             <MapIcon className="h-5 w-5 text-primary" />
             <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Node Map</h2>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8 w-8 p-0"
-            onClick={onClose}
-            aria-label="Close node map"
-            title="Close"
-          >
-            <X className="h-3.5 w-3.5" />
-          </Button>
+          <QuickTooltip content="Close">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 w-8 p-0"
+              onClick={onClose}
+              aria-label="Close node map"
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </QuickTooltip>
         </header>
 
         <div className="max-h-[calc(88vh-57px)] overflow-auto p-4">

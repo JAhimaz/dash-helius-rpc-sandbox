@@ -6,6 +6,7 @@ import { formatPathForDisplay, enumeratePaths } from "@/lib/path";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { QuickTooltip } from "@/components/ui/quick-tooltip";
 
 interface SourceNode {
   id: string;
@@ -94,22 +95,28 @@ export function JsonPathPicker({
               const isSelected = path === selectedPath;
               return (
                 <li key={path}>
-                  <Button
-                    className="h-auto w-full justify-start px-2 py-1 text-left"
-                    variant={isSelected ? "default" : "secondary"}
-                    size="sm"
-                    onClick={() => {
-                      if (!activeNode) {
-                        return;
-                      }
-                      onChange({
-                        nodeId: activeNode.id,
-                        path,
-                      });
-                    }}
+                  <QuickTooltip
+                    content={`Use ${formatPathForDisplay(path)} from ${activeNode?.name ?? "selected node"}`}
+                    className="block w-full"
                   >
-                    {formatPathForDisplay(path)}
-                  </Button>
+                    <Button
+                      className="h-auto w-full justify-start px-2 py-1 text-left"
+                      variant={isSelected ? "default" : "secondary"}
+                      size="sm"
+                      aria-label={`Use ${formatPathForDisplay(path)} from ${activeNode?.name ?? "selected node"}`}
+                      onClick={() => {
+                        if (!activeNode) {
+                          return;
+                        }
+                        onChange({
+                          nodeId: activeNode.id,
+                          path,
+                        });
+                      }}
+                    >
+                      {formatPathForDisplay(path)}
+                    </Button>
+                  </QuickTooltip>
                 </li>
               );
             })}

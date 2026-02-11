@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { QuickTooltip } from "@/components/ui/quick-tooltip";
 import type { MethodRegistryEntry } from "@/lib/methodRegistry";
 import type { ParamValue } from "@/lib/workflowSchema";
 import type { WorkflowNode } from "@/store/workflowStore";
@@ -117,17 +118,19 @@ export function NodeCard({
           </div>
           <div className="flex items-center gap-2">
             <Badge variant={statusVariant(node.status)}>{node.status}</Badge>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={(event) => {
-                event.stopPropagation();
-                onToggleExpand();
-              }}
-              aria-label={node.outputOpen ? "Collapse node" : "Expand node"}
-            >
-              <ChevronDown className={cn("h-3 w-3 transition-transform duration-300", node.outputOpen ? "rotate-180" : "")} />
-            </Button>
+            <QuickTooltip content={node.outputOpen ? "Collapse node details" : "Expand node details"}>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onToggleExpand();
+                }}
+                aria-label={node.outputOpen ? "Collapse node" : "Expand node"}
+              >
+                <ChevronDown className={cn("h-3 w-3 transition-transform duration-300", node.outputOpen ? "rotate-180" : "")} />
+              </Button>
+            </QuickTooltip>
           </div>
         </div>
       </CardHeader>
@@ -174,25 +177,37 @@ export function NodeCard({
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" onClick={onRunNode}>
-                <Play className="h-3 w-3" />
-                Run Node
-              </Button>
-              <Button size="sm" variant="outline" onClick={onRunFromHere}>
-                <PlayCircle className="h-3 w-3" />
-                Run From Here
-              </Button>
-              <Button
-                size="sm"
-                variant="destructive"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onDelete();
-                }}
-              >
-                <Trash2 className="h-3 w-3" />
-                Delete
-              </Button>
+              <QuickTooltip content="Run this node only">
+                <Button size="sm" onClick={onRunNode} aria-label="Run this node only">
+                  <Play className="h-3 w-3" />
+                  Run Node
+                </Button>
+              </QuickTooltip>
+              <QuickTooltip content="Run from this node through the rest of the workflow">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onRunFromHere}
+                  aria-label="Run from this node through the rest of the workflow"
+                >
+                  <PlayCircle className="h-3 w-3" />
+                  Run From Here
+                </Button>
+              </QuickTooltip>
+              <QuickTooltip content="Delete this node">
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onDelete();
+                  }}
+                  aria-label="Delete this node"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Delete
+                </Button>
+              </QuickTooltip>
             </div>
           </CardContent>
         </div>

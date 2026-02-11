@@ -18,6 +18,7 @@ import { NodeMapModal } from "@/components/NodeMapModal";
 import { NodeCard } from "@/components/NodeCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { QuickTooltip } from "@/components/ui/quick-tooltip";
 import { getMethodEntry, getMethodNames } from "@/lib/methodRegistry";
 import { getByPath } from "@/lib/path";
 import { useWorkflowStore } from "@/store/workflowStore";
@@ -356,6 +357,7 @@ export default function HomePage() {
             onClick={() => setShowInstructions((value) => !value)}
             aria-expanded={showInstructions}
             aria-controls="tutorial-panel"
+            aria-label={showInstructions ? "Hide tutorial instructions" : "Show tutorial instructions"}
           >
             <div className="flex items-center gap-2">
               <BookOpen className="h-5 w-5 text-primary" />
@@ -442,38 +444,41 @@ export default function HomePage() {
               />
             </div>
 
-            <Button
-              size="sm"
-              className="h-8 w-8 p-0"
-              onClick={() => void executeAll()}
-              disabled={isExecuting || order.length === 0}
-              title="Execute all"
-              aria-label="Execute all"
-            >
-              <Play className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              size="sm"
-              className="h-8 w-8 p-0"
-              variant="outline"
-              onClick={() => void executeFromSelected()}
-              disabled={isExecuting || order.length === 0}
-              title="Execute from current node"
-              aria-label="Execute from current node"
-            >
-              <StepForward className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              size="sm"
-              className="h-8 w-8 p-0"
-              variant="secondary"
-              onClick={clearOutputs}
-              disabled={isExecuting || order.length === 0}
-              title="Clear outputs"
-              aria-label="Clear outputs"
-            >
-              <MessageSquareX className="h-3.5 w-3.5" />
-            </Button>
+            <QuickTooltip content="Execute all">
+              <Button
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={() => void executeAll()}
+                disabled={isExecuting || order.length === 0}
+                aria-label="Execute all"
+              >
+                <Play className="h-3.5 w-3.5" />
+              </Button>
+            </QuickTooltip>
+            <QuickTooltip content="Execute from current node">
+              <Button
+                size="sm"
+                className="h-8 w-8 p-0"
+                variant="outline"
+                onClick={() => void executeFromSelected()}
+                disabled={isExecuting || order.length === 0}
+                aria-label="Execute from current node"
+              >
+                <StepForward className="h-3.5 w-3.5" />
+              </Button>
+            </QuickTooltip>
+            <QuickTooltip content="Clear outputs">
+              <Button
+                size="sm"
+                className="h-8 w-8 p-0"
+                variant="secondary"
+                onClick={clearOutputs}
+                disabled={isExecuting || order.length === 0}
+                aria-label="Clear outputs"
+              >
+                <MessageSquareX className="h-3.5 w-3.5" />
+              </Button>
+            </QuickTooltip>
 
             <ImportExport
               includeOutputs={includeOutputsOnExport}
@@ -487,20 +492,27 @@ export default function HomePage() {
         </section>
 
         <div className="flex justify-end gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8 w-8 p-0"
-            onClick={() => setShowNodeMap(true)}
-            title="Open node map"
-            aria-label="Open node map"
-          >
-            <MapIcon className="h-3.5 w-3.5" />
-          </Button>
-          <Button size="sm" onClick={() => setShowMethodPicker((value) => !value)}>
-            <Plus className="h-3.5 w-3.5" />
-            Add Node
-          </Button>
+          <QuickTooltip content="Open node map">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 w-8 p-0"
+              onClick={() => setShowNodeMap(true)}
+              aria-label="Open node map"
+            >
+              <MapIcon className="h-3.5 w-3.5" />
+            </Button>
+          </QuickTooltip>
+          <QuickTooltip content={showMethodPicker ? "Close method picker" : "Add a new node"}>
+            <Button
+              size="sm"
+              onClick={() => setShowMethodPicker((value) => !value)}
+              aria-label={showMethodPicker ? "Close method picker" : "Add a new node"}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add Node
+            </Button>
+          </QuickTooltip>
         </div>
 
         {showMethodPicker ? (
@@ -523,18 +535,21 @@ export default function HomePage() {
                   <ul className="space-y-1">
                     {filteredMethods.map((method) => (
                       <li key={method}>
-                        <Button
-                          className="w-full justify-start"
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => {
-                            addNode(method);
-                            setMethodQuery("");
-                            setShowMethodPicker(false);
-                          }}
-                        >
-                          {method}
-                        </Button>
+                        <QuickTooltip content={`Add ${method} node`} className="block w-full">
+                          <Button
+                            className="w-full justify-start"
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => {
+                              addNode(method);
+                              setMethodQuery("");
+                              setShowMethodPicker(false);
+                            }}
+                            aria-label={`Add ${method} node`}
+                          >
+                            {method}
+                          </Button>
+                        </QuickTooltip>
                       </li>
                     ))}
                   </ul>
