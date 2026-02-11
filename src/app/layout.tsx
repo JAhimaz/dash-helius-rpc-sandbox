@@ -3,8 +3,11 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Helius Sandbox",
+  title: "DASH - Helius RPC Workflow Builder",
   description: "Internal workflow builder for Helius RPC HTTP methods.",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({
