@@ -94,7 +94,7 @@ export function NodeCard({
     >
       <CardHeader className="gap-3">
         <div
-          className="flex cursor-pointer flex-wrap items-center justify-between gap-3 rounded-md px-1 py-1 transition-colors duration-150 ease-in-out hover:bg-foreground/5"
+          className="flex cursor-pointer flex-wrap items-center justify-between gap-3 rounded-md px-1 py-1 transition-colors duration-150 ease-in-out"
           onClick={(event) => {
             event.stopPropagation();
             onSelect();

@@ -352,7 +352,7 @@ export default function HomePage() {
         <section className="rounded-xl border border-border bg-background/80 p-4 shadow-lg shadow-black/25 backdrop-blur">
           <button
             type="button"
-            className="flex w-full items-center justify-between rounded-md px-1 py-1 text-left transition-colors duration-150 hover:bg-foreground/5"
+            className="flex w-full items-center justify-between rounded-md px-1 py-1 text-left transition-colors duration-150 cursor-pointer"
             onClick={() => setShowInstructions((value) => !value)}
             aria-expanded={showInstructions}
             aria-controls="tutorial-panel"
