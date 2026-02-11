@@ -17,6 +17,27 @@ interface ParamEditorProps {
   onRawParamsChange: (raw: string) => void;
 }
 
+const CUSTOM_LITERAL_OPTION = "__custom__";
+
+const PREDEFINED_LITERAL_OPTIONS: Record<string, string[]> = {
+  commitment: ["processed", "confirmed", "finalized"],
+  encoding: ["base58", "base64", "base64+zstd", "jsonParsed", "json"],
+};
+
+function getPresetOptions(fieldName: string): string[] | undefined {
+  const direct = PREDEFINED_LITERAL_OPTIONS[fieldName];
+  if (direct) {
+    return direct;
+  }
+
+  const tail = fieldName.split(".").at(-1);
+  if (!tail) {
+    return undefined;
+  }
+
+  return PREDEFINED_LITERAL_OPTIONS[tail];
+}
+
 function serializeLiteral(value: unknown): string {
   if (typeof value === "string") {
     return value;
@@ -84,6 +105,18 @@ export function ParamEditor({
           name: field.name,
           value: { type: "literal", value: null } as ParamValue,
         };
+        const presetOptions = getPresetOptions(field.name);
+        const literalValue = param.value.type === "literal" ? param.value.value : null;
+        const isPresetLiteral =
+          presetOptions &&
+          typeof literalValue === "string" &&
+          presetOptions.includes(literalValue);
+        const presetSelectValue =
+          literalValue === null || literalValue === undefined || literalValue === ""
+            ? ""
+            : isPresetLiteral
+              ? (literalValue as string)
+              : CUSTOM_LITERAL_OPTION;
 
         return (
           <div key={`${node.id}-${field.name}`} className="space-y-2 rounded-md border border-border p-3">
@@ -127,17 +160,58 @@ export function ParamEditor({
             </div>
 
             {param.value.type === "literal" ? (
-              <Textarea
-                className="min-h-16 font-mono text-xs"
-                value={serializeLiteral(param.value.value)}
-                onChange={(event) => {
-                  onParamChange(field.name, {
-                    type: "literal",
-                    value: parseLiteralInput(event.target.value),
-                  });
-                }}
-                placeholder="JSON value or plain text"
-              />
+              <div className="space-y-2">
+                {presetOptions ? (
+                  <select
+                    className="h-9 w-full rounded-md border border-border bg-background px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                    value={presetSelectValue}
+                    onChange={(event) => {
+                      if (event.target.value === "") {
+                        onParamChange(field.name, {
+                          type: "literal",
+                          value: null,
+                        });
+                        return;
+                      }
+
+                      if (event.target.value === CUSTOM_LITERAL_OPTION) {
+                        onParamChange(field.name, {
+                          type: "literal",
+                          value: typeof literalValue === "string" && !isPresetLiteral ? literalValue : "",
+                        });
+                        return;
+                      }
+
+                      onParamChange(field.name, {
+                        type: "literal",
+                        value: event.target.value,
+                      });
+                    }}
+                  >
+                    <option value="">Select preset value</option>
+                    {presetOptions.map((option) => (
+                      <option key={`${field.name}-${option}`} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                    <option value={CUSTOM_LITERAL_OPTION}>Custom value</option>
+                  </select>
+                ) : null}
+
+                {(!presetOptions || presetSelectValue === CUSTOM_LITERAL_OPTION) ? (
+                  <Textarea
+                    className="min-h-16 font-mono text-xs"
+                    value={serializeLiteral(param.value.value)}
+                    onChange={(event) => {
+                      onParamChange(field.name, {
+                        type: "literal",
+                        value: parseLiteralInput(event.target.value),
+                      });
+                    }}
+                    placeholder="JSON value or plain text"
+                  />
+                ) : null}
+              </div>
             ) : (
               <JsonPathPicker
                 sourceNodes={sourceNodes}
