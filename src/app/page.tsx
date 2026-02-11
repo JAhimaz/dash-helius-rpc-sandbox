@@ -23,7 +23,12 @@ import { getByPath } from "@/lib/path";
 import { useWorkflowStore } from "@/store/workflowStore";
 import type { WorkflowNode } from "@/store/workflowStore";
 
-const DEFAULT_HELIUS_RPC_URL = "https://mainnet.helius-rpc.com";
+type RpcNetwork = "mainnet" | "devnet";
+
+const DEFAULT_HELIUS_RPC_URLS: Record<RpcNetwork, string> = {
+  mainnet: "https://mainnet.helius-rpc.com",
+  devnet: "https://devnet.helius-rpc.com",
+};
 
 function resolveParamValue(
   paramValue: WorkflowNode["params"][number]["value"],
@@ -162,10 +167,11 @@ function parseRpcResponse(text: string): unknown {
   }
 }
 
-function buildHeliusRpcUrl(apiKey: string): string {
-  const configured = process.env.NEXT_PUBLIC_HELIUS_RPC_URL ?? DEFAULT_HELIUS_RPC_URL;
+function buildHeliusRpcUrl(apiKey: string, network: RpcNetwork): string {
+  const configured = process.env.NEXT_PUBLIC_HELIUS_RPC_URL;
+  const baseUrl = configured ?? DEFAULT_HELIUS_RPC_URLS[network];
 
-  const url = new URL(configured);
+  const url = new URL(baseUrl);
   if (apiKey.trim()) {
     url.searchParams.set("api-key", apiKey.trim());
   }
@@ -202,6 +208,7 @@ export default function HomePage() {
   const [methodQuery, setMethodQuery] = useState("");
   const [draggingNodeId, setDraggingNodeId] = useState<string>();
   const [showInstructions, setShowInstructions] = useState(false);
+  const [network, setNetwork] = useState<RpcNetwork>("mainnet");
 
   const orderedNodes = useMemo(
     () => order.map((nodeId) => nodes[nodeId]).filter((node): node is WorkflowNode => Boolean(node)),
@@ -249,7 +256,7 @@ export default function HomePage() {
         try {
           const params = getNodeParams(node, outputsByNodeId);
 
-          const response = await fetch(buildHeliusRpcUrl(useWorkflowStore.getState().apiKey), {
+          const response = await fetch(buildHeliusRpcUrl(useWorkflowStore.getState().apiKey, network), {
             method: "POST",
             headers: {
               "content-type": "application/json",
@@ -318,10 +325,27 @@ export default function HomePage() {
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(232,65,37,0.16),transparent_42%),linear-gradient(180deg,#090909_0%,#0f0f10_100%)] p-6 text-foreground">
       <div className="mx-auto max-w-6xl space-y-6">
         <header>
-          <div className="flex items-center gap-2">
-            <PanelRightClose className="h-8 w-8 text-primary" />
-            <h1 className="text-[1.5rem] font-bold tracking-wide text-primary">DASH</h1>
-            <span className="text-sm text-foreground/50">RPC Workflow Builder</span>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <PanelRightClose className="h-8 w-8 text-primary" />
+              <h1 className="text-[1.5rem] font-bold tracking-wide text-primary">DASH</h1>
+              <span className="text-sm text-foreground/50">RPC Workflow Builder</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <label htmlFor="network-select" className="text-xs font-semibold uppercase tracking-wide text-foreground/65">
+                Network
+              </label>
+              <select
+                id="network-select"
+                value={network}
+                onChange={(event) => setNetwork(event.target.value as RpcNetwork)}
+                className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+              >
+                <option value="mainnet">Mainnet</option>
+                <option value="devnet">Devnet</option>
+              </select>
+            </div>
           </div>
         </header>
 
