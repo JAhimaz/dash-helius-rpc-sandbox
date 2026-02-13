@@ -9,6 +9,8 @@
   --warning: #ffc107;
   --error: #f44336;
   --border: rgb(255 255 255 / 0.1);
+  --text: #dbdbdb;
+  --text-dim: #a0a0a0;
 }
 
 @theme inline {
@@ -19,6 +21,8 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-border: var(--border);
+  --text-primary: var(--text);
+  --text-dim: var(--text-dim); 
 }
 
 * {

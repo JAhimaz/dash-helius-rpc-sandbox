@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { type FormEvent, useMemo, useState } from "react";
 import {
+  BotMessageSquare,
   BookOpen,
   ChevronDown,
   KeyRound,
@@ -10,6 +11,7 @@ import {
   PanelRightClose,
   Play,
   Plus,
+  Send,
   Search,
   StepForward,
 } from "lucide-react";
@@ -36,6 +38,116 @@ interface MethodCategory {
   id: MethodCategoryId;
   label: string;
   methods: string[];
+}
+
+interface ChatNodeProposal {
+  localId?: string;
+  method: string;
+  paramsByField?: Record<string, unknown>;
+  rawParams?: unknown[];
+}
+
+interface ChatPlanSummary {
+  task: string;
+  methods: string[];
+  requiredArguments: string[];
+}
+
+interface ChatMessage {
+  role: "user" | "assistant";
+  text: string;
+  plan?: ChatPlanSummary;
+}
+
+interface ChatResponsePayload {
+  reply?: string;
+  error?: string;
+  nodeProposals?: ChatNodeProposal[];
+  nodeProposal?: ChatNodeProposal | null;
+  canAddNodes?: boolean;
+  canAddNode?: boolean;
+  availabilityError?: string;
+}
+
+interface RunRangeResult {
+  success: boolean;
+  failedNodeId?: string;
+  failedNodeName?: string;
+  errorMessage?: string;
+}
+
+function readNonEmptyString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function formatArgumentLabel(name: string): string {
+  return name
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function toWorkflowParamValue(
+  proposedValue: unknown,
+  createdNodeIds: Array<string | undefined>,
+  localIdToNodeId: Map<string, string>,
+): WorkflowNode["params"][number]["value"] {
+  if (
+    typeof proposedValue === "object" &&
+    proposedValue !== null &&
+    (proposedValue as { type?: unknown }).type === "ref"
+  ) {
+    const path = readNonEmptyString((proposedValue as { path?: unknown }).path);
+    if (path) {
+      let sourceNodeId: string | undefined;
+
+      const fromNodeIndex = (proposedValue as { fromNodeIndex?: unknown }).fromNodeIndex;
+      if (
+        typeof fromNodeIndex === "number" &&
+        Number.isInteger(fromNodeIndex) &&
+        fromNodeIndex >= 0 &&
+        fromNodeIndex < createdNodeIds.length
+      ) {
+        sourceNodeId = createdNodeIds[fromNodeIndex];
+      }
+
+      if (!sourceNodeId) {
+        const localRef =
+          readNonEmptyString((proposedValue as { fromNodeLocalId?: unknown }).fromNodeLocalId) ??
+          readNonEmptyString((proposedValue as { fromLocalId?: unknown }).fromLocalId) ??
+          readNonEmptyString((proposedValue as { node?: unknown }).node);
+        if (localRef) {
+          sourceNodeId = localIdToNodeId.get(localRef) ?? sourceNodeId;
+        }
+      }
+
+      if (!sourceNodeId) {
+        const directNodeId = readNonEmptyString((proposedValue as { fromNodeId?: unknown }).fromNodeId);
+        if (directNodeId) {
+          sourceNodeId = directNodeId;
+        }
+      }
+
+      if (sourceNodeId) {
+        return {
+          type: "ref",
+          nodeId: sourceNodeId,
+          path,
+        };
+      }
+    }
+  }
+
+  return {
+    type: "literal",
+    value: proposedValue,
+  };
 }
 
 const DEFAULT_HELIUS_RPC_URLS: Record<RpcNetwork, string> = {
@@ -339,6 +451,11 @@ export default function HomePage() {
   const [statusMessage, setStatusMessage] = useState<string>("");
   const [showMethodPicker, setShowMethodPicker] = useState(false);
   const [showNodeMap, setShowNodeMap] = useState(false);
+  const [showBotPanel, setShowBotPanel] = useState(false);
+  const [isBotReplying, setIsBotReplying] = useState(false);
+  const [isBotTesting, setIsBotTesting] = useState(false);
+  const [botInput, setBotInput] = useState("");
+  const [botMessages, setBotMessages] = useState<ChatMessage[]>([]);
   const [methodQuery, setMethodQuery] = useState("");
   const [selectedMethodCategoryId, setSelectedMethodCategoryId] = useState<MethodCategoryId>("solana-rpc-apis");
   const [selectedMethod, setSelectedMethod] = useState<string>();
@@ -419,11 +536,220 @@ export default function HomePage() {
     [activeMethod, methodEntries],
   );
 
-  const runRange = async (startIndex: number, endIndexExclusive: number) => {
-    if (startIndex < 0) {
+  const hasHeliusApiKey = apiKey.trim().length > 0;
+  const isBotInputDisabled = isBotReplying || isBotTesting || isExecuting || !hasHeliusApiKey;
+
+  const requestChatPlan = async (messages: Array<{ role: "user" | "assistant"; text: string }>): Promise<ChatResponsePayload> => {
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ messages }),
+    });
+
+    const data = (await response.json()) as ChatResponsePayload;
+    if (!response.ok) {
+      throw new Error(data.error ?? "Failed to get a response from Claude.");
+    }
+    return data;
+  };
+
+  const extractProposals = (data: ChatResponsePayload): ChatNodeProposal[] =>
+    Array.isArray(data.nodeProposals) ? data.nodeProposals : data.nodeProposal ? [data.nodeProposal] : [];
+
+  const applyNodeProposals = (proposals: ChatNodeProposal[]) => {
+    const createdNodeIdsByIndex: Array<string | undefined> = [];
+    const createdMethodNames: string[] = [];
+    const localIdToNodeId = new Map<string, string>();
+
+    for (let index = 0; index < proposals.length; index += 1) {
+      const proposal = proposals[index];
+      const methodEntry = getMethodEntry(proposal.method);
+      if (!methodEntry) {
+        continue;
+      }
+
+      const nodeId = addNode(proposal.method);
+      createdNodeIdsByIndex[index] = nodeId;
+      createdMethodNames.push(proposal.method);
+
+      const localId = readNonEmptyString(proposal.localId);
+      if (localId) {
+        localIdToNodeId.set(localId, nodeId);
+      }
+    }
+
+    for (let index = 0; index < proposals.length; index += 1) {
+      const proposal = proposals[index];
+      const nodeId = createdNodeIdsByIndex[index];
+      if (!nodeId) {
+        continue;
+      }
+
+      const methodEntry = getMethodEntry(proposal.method);
+      if (!methodEntry) {
+        continue;
+      }
+
+      if (methodEntry.params?.kind === "table") {
+        const paramsByField = proposal.paramsByField ?? {};
+        for (const field of methodEntry.params.fields) {
+          if (Object.prototype.hasOwnProperty.call(paramsByField, field.name)) {
+            setParamValue(
+              nodeId,
+              field.name,
+              toWorkflowParamValue(paramsByField[field.name], createdNodeIdsByIndex, localIdToNodeId),
+            );
+          }
+        }
+      } else if (proposal.rawParams) {
+        setRawParamsJson(nodeId, JSON.stringify(proposal.rawParams, null, 2));
+      }
+    }
+
+    return {
+      createdNodeIds: createdNodeIdsByIndex.filter((nodeId): nodeId is string => Boolean(nodeId)),
+      createdMethodNames,
+    };
+  };
+
+  const handleBotSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const message = botInput.trim();
+    if (!message || isBotReplying || isBotTesting || isExecuting || !hasHeliusApiKey) {
       return;
     }
 
+    const messageHistory = botMessages.map((entry) => ({ role: entry.role, text: entry.text }));
+    const nextMessages = [...messageHistory, { role: "user", text: message } as const];
+    setBotMessages((prev) => [...prev, { role: "user", text: message }]);
+    setBotInput("");
+
+    setIsBotReplying(true);
+    try {
+      const data = await requestChatPlan(nextMessages);
+
+      const reply = data.reply?.trim() ? data.reply : "No response returned.";
+      let assistantReply = reply;
+      let assistantPlan: ChatPlanSummary | undefined;
+
+      const proposals = extractProposals(data);
+      const canAddNodes = Boolean(data.canAddNodes ?? data.canAddNode);
+
+      if (proposals.length > 0) {
+        const requiredArgumentsSet = new Set<string>();
+        for (const proposal of proposals) {
+          const methodEntry = getMethodEntry(proposal.method);
+          if (methodEntry?.params?.kind !== "table") {
+            continue;
+          }
+
+          const paramsByField = proposal.paramsByField ?? {};
+          for (const field of methodEntry.params.fields) {
+            if (!field.required) {
+              continue;
+            }
+            if (!Object.prototype.hasOwnProperty.call(paramsByField, field.name)) {
+              continue;
+            }
+            requiredArgumentsSet.add(formatArgumentLabel(field.name));
+          }
+        }
+        const requiredArguments = [...requiredArgumentsSet];
+
+        if (canAddNodes) {
+          const { createdNodeIds, createdMethodNames } = applyNodeProposals(proposals);
+
+          assistantPlan = {
+            task: message,
+            methods: createdMethodNames.length > 0 ? createdMethodNames : proposals.map((proposal) => proposal.method),
+            requiredArguments,
+          };
+
+          if (createdMethodNames.length > 0) {
+            assistantReply = `Added ${createdMethodNames.length} node(s) to the workflow.`;
+
+            setIsBotTesting(true);
+            clearOutputs();
+            const initialRun = await runRange(0, useWorkflowStore.getState().order.length);
+
+            if (initialRun.success) {
+              assistantReply += " Validation passed.";
+            } else {
+              const workflowState = useWorkflowStore.getState();
+              const recentNodes = createdNodeIds
+                .map((nodeId) => workflowState.nodes[nodeId])
+                .filter((node): node is WorkflowNode => Boolean(node))
+                .map((node, index) => ({
+                  index,
+                  method: node.method,
+                  params: node.params,
+                  rawParamsJson: node.rawParamsJson,
+                }));
+
+              const repairRequest = [
+                "The workflow validation run failed. Provide a corrected replacement plan for the recently added nodes.",
+                `Failed node: ${initialRun.failedNodeName ?? "unknown"}`,
+                `Error: ${initialRun.errorMessage ?? "unknown error"}`,
+                `Network: ${network}`,
+                `Recently added nodes: ${JSON.stringify(recentNodes)}`,
+                "Return corrected proposedNodes only.",
+              ].join("\n");
+
+              const repairData = await requestChatPlan([
+                ...nextMessages,
+                { role: "assistant", text: assistantReply },
+                { role: "user", text: repairRequest },
+              ]);
+
+              const repairProposals = extractProposals(repairData);
+              const canRepair = Boolean(repairData.canAddNodes ?? repairData.canAddNode);
+
+              if (canRepair && repairProposals.length > 0) {
+                for (let index = createdNodeIds.length - 1; index >= 0; index -= 1) {
+                  removeNode(createdNodeIds[index]);
+                }
+
+                applyNodeProposals(repairProposals);
+                clearOutputs();
+                const repairRun = await runRange(0, useWorkflowStore.getState().order.length);
+
+                assistantReply += repairRun.success
+                  ? " Initial validation failed, then auto-correction succeeded."
+                  : ` Auto-correction attempted but still failed at ${repairRun.failedNodeName ?? "a node"}: ${repairRun.errorMessage ?? "unknown error"}.`;
+              } else {
+                assistantReply += ` Validation failed and no safe correction plan was available: ${repairData.availabilityError ?? "unknown reason"}.`;
+              }
+            }
+            setIsBotTesting(false);
+          } else {
+            assistantReply = "No nodes were added because none of the proposed methods were available.";
+          }
+        } else {
+          assistantReply = `Could not add node(s): ${data.availabilityError ?? "Suggested RPC plan is unavailable in this workflow."}`;
+        }
+      }
+
+      setBotMessages((prev) => [...prev, { role: "assistant", text: assistantReply, plan: assistantPlan }]);
+    } catch (error) {
+      const messageText = error instanceof Error ? error.message : "Unknown error";
+      setBotMessages((prev) => [...prev, { role: "assistant", text: `Error: ${messageText}` }]);
+    } finally {
+      setIsBotTesting(false);
+      setIsBotReplying(false);
+    }
+  };
+
+  const runRange = async (startIndex: number, endIndexExclusive: number): Promise<RunRangeResult> => {
+    if (startIndex < 0) {
+      return {
+        success: false,
+        errorMessage: "Invalid start index for execution.",
+      };
+    }
+
+    let runResult: RunRangeResult = { success: true };
     const currentState = useWorkflowStore.getState();
     const outputsByNodeId = new Map<string, unknown>();
 
@@ -520,6 +846,12 @@ export default function HomePage() {
 
             setNodeStatus(node.id, "error", message);
             setStatusMessage(`Execution stopped at ${node.name}: ${message}`);
+            runResult = {
+              success: false,
+              failedNodeId: node.id,
+              failedNodeName: node.name,
+              errorMessage: message,
+            };
             break;
           }
 
@@ -528,6 +860,12 @@ export default function HomePage() {
             const message = typeof rpcError === "string" ? rpcError : JSON.stringify(rpcError);
             setNodeStatus(node.id, "error", message);
             setStatusMessage(`Execution stopped at ${node.name}: ${message}`);
+            runResult = {
+              success: false,
+              failedNodeId: node.id,
+              failedNodeName: node.name,
+              errorMessage: message,
+            };
             break;
           }
 
@@ -537,12 +875,20 @@ export default function HomePage() {
           const message = error instanceof Error ? error.message : "Unknown execution error";
           setNodeStatus(node.id, "error", message);
           setStatusMessage(`Execution stopped at ${node.name}: ${message}`);
+          runResult = {
+            success: false,
+            failedNodeId: node.id,
+            failedNodeName: node.name,
+            errorMessage: message,
+          };
           break;
         }
       }
     } finally {
       setIsExecuting(false);
     }
+
+    return runResult;
   };
 
   const executeAll = async () => {
@@ -728,28 +1074,145 @@ export default function HomePage() {
           {statusMessage ? <p className="mt-3 text-xs text-foreground/80">{statusMessage}</p> : null}
         </section>
 
-        <div className="flex justify-end gap-2">
-          <QuickTooltip content="Open node map">
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 w-8 p-0"
-              onClick={() => setShowNodeMap(true)}
-              aria-label="Open node map"
-            >
-              <MapIcon className="h-3.5 w-3.5" />
-            </Button>
-          </QuickTooltip>
-          <QuickTooltip content={showMethodPicker ? "Close method picker" : "Add a new node"}>
-            <Button
-              size="sm"
-              onClick={() => setShowMethodPicker((value) => !value)}
-              aria-label={showMethodPicker ? "Close method picker" : "Add a new node"}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Add Node
-            </Button>
-          </QuickTooltip>
+        <div>
+          <div className="flex justify-end gap-2">
+            <QuickTooltip content="Open node map">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 w-8 p-0"
+                onClick={() => setShowNodeMap(true)}
+                aria-label="Open node map"
+              >
+                <MapIcon className="h-3.5 w-3.5" />
+              </Button>
+            </QuickTooltip>
+            <QuickTooltip content="Help me build">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 w-8 p-0"
+                onClick={() =>
+                  setShowBotPanel((value) => {
+                    const next = !value;
+                    if (next) {
+                      setShowMethodPicker(false);
+                    }
+                    return next;
+                  })
+                }
+                aria-label={showBotPanel ? "Close bot panel" : "Open bot panel"}
+              >
+                <BotMessageSquare className="h-3.5 w-3.5" />
+              </Button>
+            </QuickTooltip>
+            <QuickTooltip content={showMethodPicker ? "Close method picker" : "Add a new node"}>
+              <Button
+                size="sm"
+                onClick={() =>
+                  setShowMethodPicker((value) => {
+                    const next = !value;
+                    if (next) {
+                      setShowBotPanel(false);
+                    }
+                    return next;
+                  })
+                }
+                aria-label={showMethodPicker ? "Close method picker" : "Add a new node"}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add Node
+              </Button>
+            </QuickTooltip>
+          </div>
+
+          <div
+            className={`grid transition-[grid-template-rows,opacity,margin-top] duration-300 ease-in-out ${showBotPanel ? "mt-3 grid-rows-[1fr] opacity-100" : "pointer-events-none mt-0 grid-rows-[0fr] opacity-0"}`}
+            aria-hidden={!showBotPanel}
+          >
+            <div className="overflow-hidden">
+              <section
+                className={`w-full rounded-xl border border-border bg-background/80 p-4 shadow-lg shadow-black/25 backdrop-blur transition-transform duration-300 ease-in-out ${showBotPanel ? "translate-y-0" : "-translate-y-2"}`}
+              >
+                <div className="space-y-3">
+                  <div className="h-[220px] space-y-3 overflow-y-auto px-1 py-2">
+                    {botMessages.length === 0 ? (
+                      <p className="text-sm text-foreground/50">Tell me what you want to do. 🤖</p>
+                    ) : (
+                      botMessages.map((message, index) => (
+                        <div
+                          key={`${message.role}-${index}-${message.text}`}
+                          className={message.role === "user" ? "flex justify-end" : "flex justify-start"}
+                        >
+                          {message.role === "assistant" && message.plan ? (
+                            <div className="w-fit max-w-[75%] space-y-1 text-sm leading-6 text-foreground">
+                              <p className="text-justify">
+                                In order to achieve "{message.plan.task}", you will have to call the following:
+                              </p>
+                              {message.plan.methods.map((method, methodIndex) => (
+                                <p key={`${method}-${methodIndex}`} className="font-semibold text-primary">
+                                  {method}
+                                </p>
+                              ))}
+                              {message.plan.requiredArguments.length > 0 ? (
+                                <p className="pt-1 text-justify">If necessary, I will require the following arguments:</p>
+                              ) : null}
+                              {message.plan.requiredArguments.map((argument, argIndex) => (
+                                <p key={`${argument}-${argIndex}`} className="font-semibold text-primary">
+                                  {argument}
+                                </p>
+                              ))}
+                              <p className="pt-1 text-justify text-foreground/85">{message.text}</p>
+                            </div>
+                          ) : (
+                            <p
+                              className={`w-fit max-w-[75%] text-sm leading-6 ${message.role === "user" ? "text-justify italic [color:var(--text-dim)]" : "text-justify text-foreground"}`}
+                            >
+                              {message.text}
+                            </p>
+                          )}
+                        </div>
+                      ))
+                    )}
+                    {isBotTesting ? (
+                      <div className="flex justify-start">
+                        <p className="text-sm text-foreground/60">Testing workflow...</p>
+                      </div>
+                    ) : null}
+                    {isBotReplying && !isBotTesting ? (
+                      <div className="flex justify-start">
+                        <p className="text-sm text-foreground/60">Thinking...</p>
+                      </div>
+                    ) : null}
+                  </div>
+                  <form className="flex items-center gap-2" onSubmit={handleBotSubmit}>
+                    <Input
+                      value={botInput}
+                      onChange={(event) => setBotInput(event.target.value)}
+                      placeholder={
+                        !hasHeliusApiKey
+                          ? "Add Helius API key to use assistant..."
+                          : isBotTesting || isExecuting
+                            ? "Assistant is testing workflow..."
+                            : "Type your message..."
+                      }
+                      disabled={isBotInputDisabled}
+                    />
+                    <QuickTooltip content="Send">
+                      <Button
+                        type="submit"
+                        aria-label="Send message"
+                        className="h-9 w-9 p-0"
+                        disabled={isBotInputDisabled || !botInput.trim()}
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    </QuickTooltip>
+                  </form>
+                </div>
+              </section>
+            </div>
+          </div>
         </div>
 
         {showMethodPicker ? (

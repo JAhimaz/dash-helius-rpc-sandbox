@@ -18,6 +18,20 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## Claude + Helius MCP Chat Setup
+
+Create a `.env` file in the project root and add:
+
+```bash
+ANTHROPIC_API_KEY=your_anthropic_api_key
+# Optional override (default: claude-sonnet-4-5)
+ANTHROPIC_MODEL=claude-sonnet-4-5
+```
+
+Then restart the dev server so the environment variables are loaded.
+
+The in-app chat can propose and auto-add one or more workflow nodes. Node creation is gated by the local method registry: if Claude suggests an RPC method that is not available in this app (or required args are missing), the node plan will not be added.
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More

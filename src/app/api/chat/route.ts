@@ -1,0 +1,365 @@
+import { NextResponse } from "next/server";
+import { getMethodEntries, getMethodEntry } from "@/lib/methodRegistry";
+
+const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
+const ANTHROPIC_VERSION = "2023-06-01";
+const ANTHROPIC_BETA = "mcp-client-2025-11-20";
+const HELIUS_MCP_SERVER_NAME = "helius-docs";
+const HELIUS_MCP_URL = "https://docs.helius.dev/mcp";
+const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-5";
+
+type ChatRole = "user" | "assistant";
+
+interface ClientMessage {
+  role: ChatRole;
+  text: string;
+}
+
+interface AnthropicTextBlock {
+  type?: string;
+  text?: string;
+}
+
+interface AnthropicResponse {
+  content?: AnthropicTextBlock[];
+  error?: {
+    message?: string;
+  };
+}
+
+interface ClaudeNodeProposal {
+  localId?: string;
+  method?: string;
+  paramsByField?: Record<string, unknown>;
+  rawParams?: unknown[];
+}
+
+interface ClaudeParsedPayload {
+  reply?: string;
+  proposedNode?: ClaudeNodeProposal | null;
+  proposedNodes?: ClaudeNodeProposal[] | null;
+}
+
+interface ChatNodeProposal {
+  localId?: string;
+  method: string;
+  paramsByField?: Record<string, unknown>;
+  rawParams?: unknown[];
+}
+
+export const runtime = "nodejs";
+
+function normalizeMessages(input: unknown): ClientMessage[] | null {
+  if (!Array.isArray(input)) {
+    return null;
+  }
+
+  const normalized = input
+    .map((entry) => {
+      if (typeof entry !== "object" || entry === null) {
+        return null;
+      }
+
+      const rawRole = (entry as { role?: unknown }).role;
+      const rawText = (entry as { text?: unknown }).text;
+      if ((rawRole !== "user" && rawRole !== "assistant") || typeof rawText !== "string") {
+        return null;
+      }
+
+      const text = rawText.trim();
+      if (!text) {
+        return null;
+      }
+
+      return { role: rawRole, text } as ClientMessage;
+    })
+    .filter((entry): entry is ClientMessage => Boolean(entry));
+
+  return normalized.length > 0 ? normalized : null;
+}
+
+function extractAssistantText(responseBody: AnthropicResponse): string {
+  if (!Array.isArray(responseBody.content)) {
+    return "";
+  }
+
+  return responseBody.content
+    .filter((block) => block.type === "text" && typeof block.text === "string")
+    .map((block) => block.text?.trim() ?? "")
+    .filter((text) => text.length > 0)
+    .join("\n\n");
+}
+
+function extractJsonObject(text: string): ClaudeParsedPayload | null {
+  const trimmed = text.trim();
+  const candidates: string[] = [trimmed];
+
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) {
+    candidates.push(fenced[1].trim());
+  }
+
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    candidates.push(trimmed.slice(firstBrace, lastBrace + 1));
+  }
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate) as ClaudeParsedPayload;
+      if (typeof parsed === "object" && parsed !== null) {
+        return parsed;
+      }
+    } catch {
+      // Keep trying candidate variants.
+    }
+  }
+
+  return null;
+}
+
+function toNonEmptyString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeProposalInput(raw: unknown): ClaudeNodeProposal[] {
+  if (Array.isArray(raw)) {
+    return raw.filter((entry): entry is ClaudeNodeProposal => typeof entry === "object" && entry !== null);
+  }
+
+  if (raw && typeof raw === "object") {
+    return [raw as ClaudeNodeProposal];
+  }
+
+  return [];
+}
+
+function validateProposals(raw: unknown): {
+  proposals: ChatNodeProposal[];
+  canAddNodes: boolean;
+  availabilityError?: string;
+} {
+  const rawProposals = normalizeProposalInput(raw);
+  if (rawProposals.length === 0) {
+    return {
+      proposals: [],
+      canAddNodes: false,
+    };
+  }
+
+  const proposals: ChatNodeProposal[] = [];
+
+  for (let index = 0; index < rawProposals.length; index += 1) {
+    const rawProposal = rawProposals[index];
+    const method = toNonEmptyString(rawProposal.method);
+    if (!method) {
+      return {
+        proposals: [],
+        canAddNodes: false,
+        availabilityError: `Proposed node #${index + 1} is missing a valid method.`,
+      };
+    }
+
+    const entry = getMethodEntry(method);
+    if (!entry) {
+      return {
+        proposals: [],
+        canAddNodes: false,
+        availabilityError: `Method ${method} is not available in this workflow registry.`,
+      };
+    }
+
+    const localId = toNonEmptyString(rawProposal.localId) ?? undefined;
+
+    if (entry.params?.kind === "table") {
+      const rawParamsByField = rawProposal.paramsByField;
+      const input = rawParamsByField && typeof rawParamsByField === "object" ? rawParamsByField : {};
+      const paramsByField: Record<string, unknown> = {};
+
+      for (const field of entry.params.fields) {
+        if (Object.prototype.hasOwnProperty.call(input, field.name)) {
+          paramsByField[field.name] = (input as Record<string, unknown>)[field.name];
+        }
+      }
+
+      const missingRequired = entry.params.fields
+        .filter((field) => field.required)
+        .filter((field) => !Object.prototype.hasOwnProperty.call(paramsByField, field.name))
+        .map((field) => field.name);
+      if (missingRequired.length > 0) {
+        return {
+          proposals: [],
+          canAddNodes: false,
+          availabilityError: `Method ${method} is missing required argument(s): ${missingRequired.join(", ")}`,
+        };
+      }
+
+      proposals.push({
+        localId,
+        method,
+        paramsByField,
+      });
+      continue;
+    }
+
+    const rawParams = Array.isArray(rawProposal.rawParams) ? rawProposal.rawParams : [];
+    proposals.push({
+      localId,
+      method,
+      rawParams,
+    });
+  }
+
+  return {
+    proposals,
+    canAddNodes: proposals.length > 0,
+  };
+}
+
+export async function POST(request: Request): Promise<Response> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: "Missing ANTHROPIC_API_KEY. Add it to your .env file and restart the server." },
+      { status: 500 },
+    );
+  }
+
+  let requestBody: { messages?: unknown };
+  try {
+    requestBody = (await request.json()) as { messages?: unknown };
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+
+  const messages = normalizeMessages(requestBody.messages);
+  if (!messages) {
+    return NextResponse.json({ error: "Provide a non-empty `messages` array." }, { status: 400 });
+  }
+
+  const model = process.env.ANTHROPIC_MODEL ?? DEFAULT_ANTHROPIC_MODEL;
+  const methodCatalog = getMethodEntries().map((entry) => ({
+    method: entry.method,
+    schema: entry.schema,
+    params:
+      entry.params?.kind === "table"
+        ? entry.params.fields.map((field) => ({
+            name: field.name,
+            required: Boolean(field.required),
+            type: field.type ?? "unknown",
+          }))
+        : "rawParams",
+  }));
+
+  try {
+    const response = await fetch(ANTHROPIC_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": ANTHROPIC_VERSION,
+        "anthropic-beta": ANTHROPIC_BETA,
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 1024,
+        temperature: 0,
+        system: `You are a helpful assistant for building Helius workflows.
+Use Helius MCP tools to identify the best RPC method(s) and arguments when the user asks for workflow steps.
+
+You must respond with JSON only, with this shape:
+{
+  "reply": "human-readable explanation including selected RPC method(s) and arguments",
+  "proposedNodes": [
+    {
+      "localId": "optional short id for cross-node references",
+      "method": "exact method string",
+      "paramsByField": { "fieldName": "value or ref object" },
+      "rawParams": []
+    }
+  ] | null
+}
+
+Reference object format for table params:
+{ "type": "ref", "fromNodeIndex": 0, "path": "result.value" }
+
+Rules:
+- Set "proposedNodes" to null unless the user asks to create/add/build workflow nodes.
+- For multi-step goals, include all required nodes in execution order in "proposedNodes".
+- Keep "reply" clear and concise (max 2 short sentences).
+- If method schema is table-style, use "paramsByField" and omit "rawParams".
+- If method schema is unknown/raw, use "rawParams" as an array and omit "paramsByField".
+- Each node's "method" must be one of the available methods below.
+- Do not include markdown fences or extra text outside JSON.
+
+Available methods:
+${JSON.stringify(methodCatalog)}`,
+        messages: messages.map((message) => ({
+          role: message.role,
+          content: message.text,
+        })),
+        mcp_servers: [
+          {
+            type: "url",
+            name: HELIUS_MCP_SERVER_NAME,
+            url: HELIUS_MCP_URL,
+          },
+        ],
+        tools: [
+          {
+            type: "mcp_toolset",
+            mcp_server_name: HELIUS_MCP_SERVER_NAME,
+          },
+        ],
+      }),
+    });
+
+    const responseBody = (await response.json()) as AnthropicResponse;
+    if (!response.ok) {
+      const errorMessage = responseBody.error?.message ?? "Anthropic request failed.";
+      return NextResponse.json({ error: errorMessage }, { status: response.status });
+    }
+
+    const reply = extractAssistantText(responseBody);
+    if (!reply) {
+      return NextResponse.json(
+        { error: "Claude returned no text response. Try rephrasing your request." },
+        { status: 502 },
+      );
+    }
+
+    const parsed = extractJsonObject(reply);
+    const parsedReply = parsed ? toNonEmptyString(parsed.reply) : null;
+
+    const proposedInput = parsed?.proposedNodes ?? parsed?.proposedNode ?? null;
+    const { proposals, canAddNodes, availabilityError } = validateProposals(proposedInput);
+
+    const responseReply =
+      parsedReply ??
+      (proposals.length > 0
+        ? `Planned nodes:\n${proposals
+            .map((proposal, index) => {
+              const args = proposal.paramsByField
+                ? JSON.stringify(proposal.paramsByField)
+                : JSON.stringify(proposal.rawParams ?? []);
+              return `${index + 1}. ${proposal.method} ${args}`;
+            })
+            .join("\n")}`
+        : reply);
+
+    return NextResponse.json({
+      reply: responseReply,
+      nodeProposals: proposals,
+      canAddNodes,
+      availabilityError,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown server error.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
