@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import {
   BotMessageSquare,
   BookOpen,
@@ -158,6 +158,7 @@ const DEFAULT_HELIUS_HTTP_URLS: Record<RpcNetwork, string> = {
   mainnet: "https://api.helius.xyz",
   devnet: "https://api-devnet.helius.xyz",
 };
+const SESSION_STORAGE_API_KEY = "helius-flow:api-key";
 
 function resolveParamValue(
   paramValue: WorkflowNode["params"][number]["value"],
@@ -265,6 +266,11 @@ function getNodeParams(node: WorkflowNode, outputsByNodeId: Map<string, unknown>
 
     const args: unknown[] = [];
     const options: Record<string, unknown> = {};
+    const isTokenAccountsFilterMethod =
+      node.method === "getTokenAccountsByOwner" ||
+      node.method === "getTokenAccountsByOwnerV2" ||
+      node.method === "getTokenAccountsByDelegate";
+    const tokenAccountFilter: Record<string, unknown> = {};
 
     entry.params.fields.forEach((field, index) => {
       const binding = node.params.find((param) => param.name === field.name);
@@ -283,8 +289,17 @@ function getNodeParams(node: WorkflowNode, outputsByNodeId: Map<string, unknown>
         return;
       }
 
+      if (isTokenAccountsFilterMethod && (field.name === "mint" || field.name === "programId")) {
+        tokenAccountFilter[field.name] = value;
+        return;
+      }
+
       setByDotPath(options, field.name, value);
     });
+
+    if (isTokenAccountsFilterMethod && Object.keys(tokenAccountFilter).length > 0) {
+      args.push(tokenAccountFilter);
+    }
 
     const cleanedOptions = pruneNullish(options);
     if (
@@ -462,6 +477,28 @@ export default function HomePage() {
   const [draggingNodeId, setDraggingNodeId] = useState<string>();
   const [showInstructions, setShowInstructions] = useState(false);
   const [network, setNetwork] = useState<RpcNetwork>("mainnet");
+  const [hasLoadedApiKeyFromSession, setHasLoadedApiKeyFromSession] = useState(false);
+
+  useEffect(() => {
+    const storedApiKey = window.sessionStorage.getItem(SESSION_STORAGE_API_KEY);
+    if (storedApiKey) {
+      setApiKey(storedApiKey);
+    }
+    setHasLoadedApiKeyFromSession(true);
+  }, [setApiKey]);
+
+  useEffect(() => {
+    if (!hasLoadedApiKeyFromSession) {
+      return;
+    }
+
+    if (apiKey.trim()) {
+      window.sessionStorage.setItem(SESSION_STORAGE_API_KEY, apiKey);
+      return;
+    }
+
+    window.sessionStorage.removeItem(SESSION_STORAGE_API_KEY);
+  }, [apiKey, hasLoadedApiKeyFromSession]);
 
   const orderedNodes = useMemo(
     () => order.map((nodeId) => nodes[nodeId]).filter((node): node is WorkflowNode => Boolean(node)),
@@ -638,14 +675,33 @@ export default function HomePage() {
 
     setIsBotReplying(true);
     try {
-      const data = await requestChatPlan(nextMessages, "plan");
+      let data = await requestChatPlan(nextMessages, "plan");
+      let proposals = extractProposals(data);
+      let canAddNodes = Boolean(data.canAddNodes ?? data.canAddNode);
 
-      const reply = data.reply?.trim() ? data.reply : "No response returned.";
-      let assistantReply = reply;
+      if (proposals.length === 0 || !canAddNodes) {
+        const retryData = await requestChatPlan(
+          [
+            ...nextMessages,
+            {
+              role: "user",
+              text: "Add workflow nodes now. Return a non-empty proposedNodes array using only available methods.",
+            },
+          ],
+          "plan",
+        );
+
+        const retryProposals = extractProposals(retryData);
+        const canRetryAddNodes = Boolean(retryData.canAddNodes ?? retryData.canAddNode);
+        if (retryProposals.length > 0 && canRetryAddNodes) {
+          data = retryData;
+          proposals = retryProposals;
+          canAddNodes = canRetryAddNodes;
+        }
+      }
+
+      let assistantReply = "Could not create a valid node plan. Please ask me to add nodes for a specific task.";
       let assistantPlan: ChatPlanSummary | undefined;
-
-      const proposals = extractProposals(data);
-      const canAddNodes = Boolean(data.canAddNodes ?? data.canAddNode);
 
       if (proposals.length > 0) {
         const requiredArgumentsSet = new Set<string>();
@@ -742,6 +798,8 @@ export default function HomePage() {
         } else {
           assistantReply = `Could not add node(s): ${data.availabilityError ?? "Suggested RPC plan is unavailable in this workflow."}`;
         }
+      } else if (data.availabilityError) {
+        assistantReply = `Could not add node(s): ${data.availabilityError}`;
       }
 
       setBotMessages((prev) => [...prev, { role: "assistant", text: assistantReply, plan: assistantPlan }]);
@@ -1104,7 +1162,7 @@ export default function HomePage() {
               <Button
                 size="sm"
                 variant="outline"
-                className="h-8 w-8 p-0"
+                className="h-8 px-3"
                 onClick={() =>
                   setShowBotPanel((value) => {
                     const next = !value;
@@ -1117,6 +1175,7 @@ export default function HomePage() {
                 aria-label={showBotPanel ? "Close bot panel" : "Open bot panel"}
               >
                 <BotMessageSquare className="h-3.5 w-3.5" />
+                Help Me Build
               </Button>
             </QuickTooltip>
             <QuickTooltip content={showMethodPicker ? "Close method picker" : "Add a new node"}>

@@ -7,8 +7,8 @@ const ANTHROPIC_BETA = "mcp-client-2025-11-20";
 const HELIUS_MCP_SERVER_NAME = "helius-docs";
 const HELIUS_MCP_URL = "https://docs.helius.dev/mcp";
 const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-5";
-const DEFAULT_PLANNER_MAX_TOKENS = 320;
-const DEFAULT_REPAIR_MAX_TOKENS = 220;
+const DEFAULT_PLANNER_MAX_TOKENS = 700;
+const DEFAULT_REPAIR_MAX_TOKENS = 320;
 const MODEL_ALIAS_MAP: Record<string, string> = {
   "claude-3-5-haiku-latest": "claude-3-5-haiku-20241022",
   "claude-3-5-sonnet-latest": "claude-3-5-sonnet-20241022",
@@ -35,6 +35,7 @@ interface AnthropicTextBlock {
 
 interface AnthropicResponse {
   content?: AnthropicTextBlock[];
+  stop_reason?: string;
   error?: {
     message?: string;
   };
@@ -343,7 +344,7 @@ function validateProposals(raw: unknown): {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
   if (!apiKey) {
     return NextResponse.json(
       { error: "Missing ANTHROPIC_API_KEY. Add it to your .env file and restart the server." },
@@ -394,13 +395,7 @@ export async function POST(request: Request): Promise<Response> {
         : "rawParams",
   }));
   const useMcp = shouldUseMcp(lastUserMessage, mode);
-
-  try {
-    const bodyPayload: Record<string, unknown> = {
-      model: resolvedModel,
-      max_tokens: maxTokens,
-      temperature: 0,
-      system: `You are a helpful assistant for building Helius workflows.
+  const systemPrompt = `You are a helpful assistant for building Helius workflows.
 ${useMcp ? "Use Helius MCP tools when needed to disambiguate methods." : "Use only the local available methods below."}
 
 You must respond with JSON only, with this shape:
@@ -426,53 +421,70 @@ Rules:
 - If method schema is table-style, use "paramsByField" and omit "rawParams".
 - If method schema is unknown/raw, use "rawParams" as an array and omit "paramsByField".
 - Each node's "method" must be one of the candidate methods below.
+- For getTokenAccountsByOwnerV2, if "programId" is provided, use exactly "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" unless the user explicitly asks for a different valid program.
+- For getTokenAccountsByOwnerV2, default "encoding" to "base64" unless the user explicitly requests another encoding.
 - Do not include markdown fences or extra text outside JSON.
 
 Candidate methods:
 ${JSON.stringify(candidateMethodNames)}
 
 Candidate method details:
-${JSON.stringify(candidateCatalog)}`,
-      messages: messages.map((message) => ({
-        role: message.role,
-        content: message.text,
-      })),
+${JSON.stringify(candidateCatalog)}`;
+
+  const toAnthropicMessages = (inputMessages: ClientMessage[]) =>
+    inputMessages.map((message) => ({
+      role: message.role,
+      content: message.text,
+    }));
+
+  try {
+    const sendAnthropicRequest = async (inputMessages: ClientMessage[], tokenBudget: number): Promise<AnthropicResponse> => {
+      const bodyPayload: Record<string, unknown> = {
+      model: resolvedModel,
+      max_tokens: tokenBudget,
+      temperature: 0,
+      system: systemPrompt,
+      messages: toAnthropicMessages(inputMessages),
+      };
+
+      if (useMcp) {
+        bodyPayload.mcp_servers = [
+          {
+            type: "url",
+            name: HELIUS_MCP_SERVER_NAME,
+            url: HELIUS_MCP_URL,
+          },
+        ];
+        bodyPayload.tools = [
+          {
+            type: "mcp_toolset",
+            mcp_server_name: HELIUS_MCP_SERVER_NAME,
+          },
+        ];
+      }
+
+      const response = await fetch(ANTHROPIC_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": ANTHROPIC_VERSION,
+          ...(useMcp ? { "anthropic-beta": ANTHROPIC_BETA } : {}),
+        },
+        body: JSON.stringify(bodyPayload),
+      });
+
+      const responseBody = (await response.json()) as AnthropicResponse;
+      if (!response.ok) {
+        const errorMessage = responseBody.error?.message ?? "Anthropic request failed.";
+        throw new Error(errorMessage);
+      }
+
+      return responseBody;
     };
 
-    if (useMcp) {
-      bodyPayload.mcp_servers = [
-        {
-          type: "url",
-          name: HELIUS_MCP_SERVER_NAME,
-          url: HELIUS_MCP_URL,
-        },
-      ];
-      bodyPayload.tools = [
-        {
-          type: "mcp_toolset",
-          mcp_server_name: HELIUS_MCP_SERVER_NAME,
-        },
-      ];
-    }
-
-    const response = await fetch(ANTHROPIC_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": ANTHROPIC_VERSION,
-        ...(useMcp ? { "anthropic-beta": ANTHROPIC_BETA } : {}),
-      },
-      body: JSON.stringify(bodyPayload),
-    });
-
-    const responseBody = (await response.json()) as AnthropicResponse;
-    if (!response.ok) {
-      const errorMessage = responseBody.error?.message ?? "Anthropic request failed.";
-      return NextResponse.json({ error: errorMessage }, { status: response.status });
-    }
-
-    const reply = extractAssistantText(responseBody);
+    let responseBody = await sendAnthropicRequest(messages, maxTokens);
+    let reply = extractAssistantText(responseBody);
     if (!reply) {
       return NextResponse.json(
         { error: "Claude returned no text response. Try rephrasing your request." },
@@ -480,7 +492,20 @@ ${JSON.stringify(candidateCatalog)}`,
       );
     }
 
-    const parsed = extractJsonObject(reply);
+    let parsed = extractJsonObject(reply);
+    if (!parsed || responseBody.stop_reason === "max_tokens") {
+      const retryMessages: ClientMessage[] = [
+        ...messages,
+        {
+          role: "user",
+          text: "Return ONLY one complete valid JSON object following the required schema. No markdown, no commentary.",
+        },
+      ];
+      responseBody = await sendAnthropicRequest(retryMessages, Math.max(maxTokens + 400, 900));
+      reply = extractAssistantText(responseBody) || reply;
+      parsed = extractJsonObject(reply);
+    }
+
     const parsedReply = parsed ? toNonEmptyString(parsed.reply) : null;
 
     const proposedInput = parsed?.proposedNodes ?? parsed?.proposedNode ?? null;

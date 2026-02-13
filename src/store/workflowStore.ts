@@ -41,6 +41,13 @@ interface WorkflowStore {
   setIncludeOutputsOnExport: (value: boolean) => void;
 }
 
+const METHOD_DEFAULT_LITERAL_PARAMS: Record<string, Record<string, unknown>> = {
+  getTokenAccountsByOwnerV2: {
+    programId: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    encoding: "base64",
+  },
+};
+
 function defaultNodeName(method: string, position: number): string {
   return `${method} #${position}`;
 }
@@ -61,11 +68,17 @@ function buildDefaultParams(method: string): {
   }
 
   if (entry.params?.kind === "table") {
+    const methodDefaults = METHOD_DEFAULT_LITERAL_PARAMS[method] ?? {};
     return {
       schemaMode: "known",
       params: entry.params.fields.map((field) => ({
         name: field.name,
-        value: { type: "literal", value: null },
+        value: {
+          type: "literal",
+          value: Object.prototype.hasOwnProperty.call(methodDefaults, field.name)
+            ? methodDefaults[field.name]
+            : null,
+        },
       })),
       rawParamsJson: "[]",
     };

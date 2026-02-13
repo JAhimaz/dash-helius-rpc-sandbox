@@ -25,12 +25,13 @@ const PREDEFINED_LITERAL_OPTIONS: Record<string, string[]> = {
 };
 
 function getPresetOptions(fieldName: string): string[] | undefined {
-  const direct = PREDEFINED_LITERAL_OPTIONS[fieldName];
+  const normalizedFieldName = fieldName.trim().toLowerCase();
+  const direct = PREDEFINED_LITERAL_OPTIONS[normalizedFieldName];
   if (direct) {
     return direct;
   }
 
-  const tail = fieldName.split(".").at(-1);
+  const tail = normalizedFieldName.split(".").at(-1);
   if (!tail) {
     return undefined;
   }
