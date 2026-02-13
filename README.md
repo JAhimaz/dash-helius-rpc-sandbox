@@ -27,8 +27,8 @@ ANTHROPIC_API_KEY=your_anthropic_api_key
 # Optional override (default: claude-sonnet-4-5)
 ANTHROPIC_MODEL=claude-sonnet-4-5
 # Optional low-cost planner/repair split
-ANTHROPIC_MODEL_PLANNER=claude-3-5-haiku-latest
-ANTHROPIC_MODEL_REPAIR=claude-3-5-haiku-latest
+ANTHROPIC_MODEL_PLANNER=claude-3-5-haiku-20241022
+ANTHROPIC_MODEL_REPAIR=claude-3-5-haiku-20241022
 # Optional token caps for cost control
 ANTHROPIC_MAX_TOKENS_PLANNER=320
 ANTHROPIC_MAX_TOKENS_REPAIR=220

@@ -9,6 +9,12 @@ const HELIUS_MCP_URL = "https://docs.helius.dev/mcp";
 const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-5";
 const DEFAULT_PLANNER_MAX_TOKENS = 320;
 const DEFAULT_REPAIR_MAX_TOKENS = 220;
+const MODEL_ALIAS_MAP: Record<string, string> = {
+  "claude-3-5-haiku-latest": "claude-3-5-haiku-20241022",
+  "claude-3-5-sonnet-latest": "claude-3-5-sonnet-20241022",
+  "claude-3-7-sonnet-latest": "claude-3-7-sonnet-20250219",
+  "claude-sonnet-4-5": "claude-sonnet-4-20250514",
+};
 
 type ChatRole = "user" | "assistant";
 
@@ -160,6 +166,10 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
     return fallback;
   }
   return parsed;
+}
+
+function normalizeModelName(model: string): string {
+  return MODEL_ALIAS_MAP[model] ?? model;
 }
 
 function scoreMethodForMessage(method: string, message: string): number {
@@ -358,6 +368,7 @@ export async function POST(request: Request): Promise<Response> {
     mode === "repair"
       ? process.env.ANTHROPIC_MODEL_REPAIR ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_ANTHROPIC_MODEL
       : process.env.ANTHROPIC_MODEL_PLANNER ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_ANTHROPIC_MODEL;
+  const resolvedModel = normalizeModelName(model);
   const maxTokens =
     mode === "repair"
       ? parsePositiveInt(process.env.ANTHROPIC_MAX_TOKENS_REPAIR, DEFAULT_REPAIR_MAX_TOKENS)
@@ -386,7 +397,7 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const bodyPayload: Record<string, unknown> = {
-      model,
+      model: resolvedModel,
       max_tokens: maxTokens,
       temperature: 0,
       system: `You are a helpful assistant for building Helius workflows.
