@@ -7,12 +7,19 @@ const ANTHROPIC_BETA = "mcp-client-2025-11-20";
 const HELIUS_MCP_SERVER_NAME = "helius-docs";
 const HELIUS_MCP_URL = "https://docs.helius.dev/mcp";
 const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-5";
+const DEFAULT_PLANNER_MAX_TOKENS = 320;
+const DEFAULT_REPAIR_MAX_TOKENS = 220;
 
 type ChatRole = "user" | "assistant";
 
 interface ClientMessage {
   role: ChatRole;
   text: string;
+}
+
+interface ChatRequestBody {
+  messages?: unknown;
+  mode?: unknown;
 }
 
 interface AnthropicTextBlock {
@@ -139,6 +146,110 @@ function normalizeProposalInput(raw: unknown): ClaudeNodeProposal[] {
   return [];
 }
 
+function parseMode(value: unknown): "plan" | "repair" {
+  return value === "repair" ? "repair" : "plan";
+}
+
+function parsePositiveInt(value: string | undefined, fallback: number): number {
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return parsed;
+}
+
+function scoreMethodForMessage(method: string, message: string): number {
+  const methodLower = method.toLowerCase();
+  const words = message.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  let score = 0;
+
+  for (const word of words) {
+    if (word.length < 3) {
+      continue;
+    }
+    if (methodLower.includes(word)) {
+      score += 2;
+    }
+  }
+
+  if (message.includes("balance") && methodLower.includes("balance")) {
+    score += 4;
+  }
+  if ((message.includes("log") || message.includes("print") || message.includes("output")) && methodLower === "log output") {
+    score += 4;
+  }
+  if (message.includes("airdrop") && methodLower.includes("airdrop")) {
+    score += 4;
+  }
+
+  return score;
+}
+
+function chooseCandidateEntries(message: string, limit = 8) {
+  const allEntries = getMethodEntries();
+  if (!message.trim()) {
+    return allEntries.slice(0, limit);
+  }
+
+  const lower = message.toLowerCase();
+
+  const directMethods: string[] = [];
+  if (/\bbalance\b/.test(lower)) {
+    directMethods.push("getBalance");
+  }
+  if (/\blog\b|\bprint\b|\boutput\b/.test(lower)) {
+    directMethods.push("Log Output");
+  }
+  if (/\bairdrop\b/.test(lower)) {
+    directMethods.push("requestAirdrop");
+  }
+
+  const selected = new Map<string, (typeof allEntries)[number]>();
+  for (const method of directMethods) {
+    const entry = allEntries.find((candidate) => candidate.method === method);
+    if (entry) {
+      selected.set(entry.method, entry);
+    }
+  }
+
+  const scored = allEntries
+    .map((entry) => ({ entry, score: scoreMethodForMessage(entry.method, lower) }))
+    .sort((a, b) => b.score - a.score || a.entry.method.localeCompare(b.entry.method));
+
+  for (const candidate of scored) {
+    if (selected.size >= limit) {
+      break;
+    }
+    if (candidate.score <= 0 && selected.size > 0) {
+      break;
+    }
+    selected.set(candidate.entry.method, candidate.entry);
+  }
+
+  if (selected.size === 0) {
+    return allEntries.slice(0, limit);
+  }
+
+  return [...selected.values()].slice(0, limit);
+}
+
+function shouldUseMcp(message: string, mode: "plan" | "repair"): boolean {
+  if (mode === "repair") {
+    return false;
+  }
+
+  const lower = message.toLowerCase();
+  if (/\bbalance\b/.test(lower) || /\blog\b|\bprint\b|\boutput\b/.test(lower) || /\bairdrop\b/.test(lower)) {
+    return false;
+  }
+
+  return true;
+}
+
 function validateProposals(raw: unknown): {
   proposals: ChatNodeProposal[];
   canAddNodes: boolean;
@@ -230,9 +341,9 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  let requestBody: { messages?: unknown };
+  let requestBody: ChatRequestBody;
   try {
-    requestBody = (await request.json()) as { messages?: unknown };
+    requestBody = (await request.json()) as ChatRequestBody;
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
@@ -242,8 +353,24 @@ export async function POST(request: Request): Promise<Response> {
     return NextResponse.json({ error: "Provide a non-empty `messages` array." }, { status: 400 });
   }
 
-  const model = process.env.ANTHROPIC_MODEL ?? DEFAULT_ANTHROPIC_MODEL;
-  const methodCatalog = getMethodEntries().map((entry) => ({
+  const mode = parseMode(requestBody.mode);
+  const model =
+    mode === "repair"
+      ? process.env.ANTHROPIC_MODEL_REPAIR ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_ANTHROPIC_MODEL
+      : process.env.ANTHROPIC_MODEL_PLANNER ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_ANTHROPIC_MODEL;
+  const maxTokens =
+    mode === "repair"
+      ? parsePositiveInt(process.env.ANTHROPIC_MAX_TOKENS_REPAIR, DEFAULT_REPAIR_MAX_TOKENS)
+      : parsePositiveInt(process.env.ANTHROPIC_MAX_TOKENS_PLANNER, DEFAULT_PLANNER_MAX_TOKENS);
+
+  const lastUserMessage =
+    [...messages]
+      .reverse()
+      .find((message) => message.role === "user")
+      ?.text ?? "";
+  const candidateEntries = chooseCandidateEntries(lastUserMessage);
+  const candidateMethodNames = candidateEntries.map((entry) => entry.method);
+  const candidateCatalog = candidateEntries.map((entry) => ({
     method: entry.method,
     schema: entry.schema,
     params:
@@ -255,22 +382,15 @@ export async function POST(request: Request): Promise<Response> {
           }))
         : "rawParams",
   }));
+  const useMcp = shouldUseMcp(lastUserMessage, mode);
 
   try {
-    const response = await fetch(ANTHROPIC_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": ANTHROPIC_VERSION,
-        "anthropic-beta": ANTHROPIC_BETA,
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 1024,
-        temperature: 0,
-        system: `You are a helpful assistant for building Helius workflows.
-Use Helius MCP tools to identify the best RPC method(s) and arguments when the user asks for workflow steps.
+    const bodyPayload: Record<string, unknown> = {
+      model,
+      max_tokens: maxTokens,
+      temperature: 0,
+      system: `You are a helpful assistant for building Helius workflows.
+${useMcp ? "Use Helius MCP tools when needed to disambiguate methods." : "Use only the local available methods below."}
 
 You must respond with JSON only, with this shape:
 {
@@ -294,29 +414,45 @@ Rules:
 - Keep "reply" clear and concise (max 2 short sentences).
 - If method schema is table-style, use "paramsByField" and omit "rawParams".
 - If method schema is unknown/raw, use "rawParams" as an array and omit "paramsByField".
-- Each node's "method" must be one of the available methods below.
+- Each node's "method" must be one of the candidate methods below.
 - Do not include markdown fences or extra text outside JSON.
 
-Available methods:
-${JSON.stringify(methodCatalog)}`,
-        messages: messages.map((message) => ({
-          role: message.role,
-          content: message.text,
-        })),
-        mcp_servers: [
-          {
-            type: "url",
-            name: HELIUS_MCP_SERVER_NAME,
-            url: HELIUS_MCP_URL,
-          },
-        ],
-        tools: [
-          {
-            type: "mcp_toolset",
-            mcp_server_name: HELIUS_MCP_SERVER_NAME,
-          },
-        ],
-      }),
+Candidate methods:
+${JSON.stringify(candidateMethodNames)}
+
+Candidate method details:
+${JSON.stringify(candidateCatalog)}`,
+      messages: messages.map((message) => ({
+        role: message.role,
+        content: message.text,
+      })),
+    };
+
+    if (useMcp) {
+      bodyPayload.mcp_servers = [
+        {
+          type: "url",
+          name: HELIUS_MCP_SERVER_NAME,
+          url: HELIUS_MCP_URL,
+        },
+      ];
+      bodyPayload.tools = [
+        {
+          type: "mcp_toolset",
+          mcp_server_name: HELIUS_MCP_SERVER_NAME,
+        },
+      ];
+    }
+
+    const response = await fetch(ANTHROPIC_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": ANTHROPIC_VERSION,
+        ...(useMcp ? { "anthropic-beta": ANTHROPIC_BETA } : {}),
+      },
+      body: JSON.stringify(bodyPayload),
     });
 
     const responseBody = (await response.json()) as AnthropicResponse;

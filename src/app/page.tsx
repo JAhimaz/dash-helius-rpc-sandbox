@@ -539,13 +539,16 @@ export default function HomePage() {
   const hasHeliusApiKey = apiKey.trim().length > 0;
   const isBotInputDisabled = isBotReplying || isBotTesting || isExecuting || !hasHeliusApiKey;
 
-  const requestChatPlan = async (messages: Array<{ role: "user" | "assistant"; text: string }>): Promise<ChatResponsePayload> => {
+  const requestChatPlan = async (
+    messages: Array<{ role: "user" | "assistant"; text: string }>,
+    mode: "plan" | "repair" = "plan",
+  ): Promise<ChatResponsePayload> => {
     const response = await fetch("/api/chat", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify({ messages, mode }),
     });
 
     const data = (await response.json()) as ChatResponsePayload;
@@ -557,6 +560,14 @@ export default function HomePage() {
 
   const extractProposals = (data: ChatResponsePayload): ChatNodeProposal[] =>
     Array.isArray(data.nodeProposals) ? data.nodeProposals : data.nodeProposal ? [data.nodeProposal] : [];
+
+  const buildCompactHistory = (userMessage: string): Array<{ role: "user" | "assistant"; text: string }> => {
+    const recent = botMessages
+      .slice(-4)
+      .map((entry) => ({ role: entry.role, text: entry.text }))
+      .filter((entry) => entry.text.trim().length > 0);
+    return [...recent, { role: "user", text: userMessage }];
+  };
 
   const applyNodeProposals = (proposals: ChatNodeProposal[]) => {
     const createdNodeIdsByIndex: Array<string | undefined> = [];
@@ -621,14 +632,13 @@ export default function HomePage() {
       return;
     }
 
-    const messageHistory = botMessages.map((entry) => ({ role: entry.role, text: entry.text }));
-    const nextMessages = [...messageHistory, { role: "user", text: message } as const];
+    const nextMessages = buildCompactHistory(message);
     setBotMessages((prev) => [...prev, { role: "user", text: message }]);
     setBotInput("");
 
     setIsBotReplying(true);
     try {
-      const data = await requestChatPlan(nextMessages);
+      const data = await requestChatPlan(nextMessages, "plan");
 
       const reply = data.reply?.trim() ? data.reply : "No response returned.";
       let assistantReply = reply;
@@ -697,11 +707,14 @@ export default function HomePage() {
                 "Return corrected proposedNodes only.",
               ].join("\n");
 
-              const repairData = await requestChatPlan([
-                ...nextMessages,
-                { role: "assistant", text: assistantReply },
-                { role: "user", text: repairRequest },
-              ]);
+              const repairData = await requestChatPlan(
+                [
+                  { role: "user", text: message },
+                  { role: "assistant", text: assistantReply },
+                  { role: "user", text: repairRequest },
+                ],
+                "repair",
+              );
 
               const repairProposals = extractProposals(repairData);
               const canRepair = Boolean(repairData.canAddNodes ?? repairData.canAddNode);
