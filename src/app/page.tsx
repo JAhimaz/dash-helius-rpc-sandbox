@@ -14,6 +14,8 @@ import {
   Send,
   Search,
   StepForward,
+  ToggleLeft,
+  ToggleRight,
 } from "lucide-react";
 
 import { ImportExport } from "@/components/ImportExport";
@@ -32,7 +34,7 @@ import { getByPath } from "@/lib/path";
 import { useWorkflowStore } from "@/store/workflowStore";
 import type { WorkflowNode } from "@/store/workflowStore";
 
-type RpcNetwork = "mainnet" | "devnet";
+type RpcNetwork = "mainnet" | "devnet" | "testnet";
 
 interface MethodCategory {
   id: MethodCategoryId;
@@ -153,11 +155,14 @@ function toWorkflowParamValue(
 const DEFAULT_HELIUS_RPC_URLS: Record<RpcNetwork, string> = {
   mainnet: "https://mainnet.helius-rpc.com",
   devnet: "https://devnet.helius-rpc.com",
+  testnet: "https://testnet.helius-rpc.com",
 };
 const DEFAULT_HELIUS_HTTP_URLS: Record<RpcNetwork, string> = {
   mainnet: "https://api.helius.xyz",
   devnet: "https://api-devnet.helius.xyz",
+  testnet: "https://api-testnet.helius.xyz",
 };
+const GATEKEEPER_RPC_URL = "https://beta.helius-rpc.com/";
 const SESSION_STORAGE_API_KEY = "helius-flow:api-key";
 
 function resolveParamValue(
@@ -353,9 +358,9 @@ function parseRpcResponse(text: string): unknown {
   }
 }
 
-function buildHeliusJsonRpcUrl(apiKey: string, network: RpcNetwork): string {
+function buildHeliusJsonRpcUrl(apiKey: string, network: RpcNetwork, gatekeeperEnabled: boolean): string {
   const configured = process.env.NEXT_PUBLIC_HELIUS_RPC_URL;
-  const baseUrl = configured ?? DEFAULT_HELIUS_RPC_URLS[network];
+  const baseUrl = gatekeeperEnabled ? GATEKEEPER_RPC_URL : configured ?? DEFAULT_HELIUS_RPC_URLS[network];
 
   const url = new URL(baseUrl);
   if (apiKey.trim()) {
@@ -396,7 +401,9 @@ function buildHeliusHttpUrl(
   const baseUrl =
     network === "mainnet"
       ? entry.http.mainnetBaseUrl ?? DEFAULT_HELIUS_HTTP_URLS.mainnet
-      : entry.http.devnetBaseUrl ?? DEFAULT_HELIUS_HTTP_URLS.devnet;
+      : network === "devnet"
+        ? entry.http.devnetBaseUrl ?? DEFAULT_HELIUS_HTTP_URLS.devnet
+        : DEFAULT_HELIUS_HTTP_URLS.testnet;
 
   const unresolvedPath = entry.http.path;
   const remainingParams: Record<string, unknown> = { ...params };
@@ -477,7 +484,14 @@ export default function HomePage() {
   const [draggingNodeId, setDraggingNodeId] = useState<string>();
   const [showInstructions, setShowInstructions] = useState(false);
   const [network, setNetwork] = useState<RpcNetwork>("mainnet");
+  const [gatekeeperEnabled, setGatekeeperEnabled] = useState(false);
   const [hasLoadedApiKeyFromSession, setHasLoadedApiKeyFromSession] = useState(false);
+
+  useEffect(() => {
+    if (gatekeeperEnabled && network === "testnet") {
+      setNetwork("mainnet");
+    }
+  }, [gatekeeperEnabled, network]);
 
   useEffect(() => {
     const storedApiKey = window.sessionStorage.getItem(SESSION_STORAGE_API_KEY);
@@ -890,7 +904,7 @@ export default function HomePage() {
           } else {
             const params = getNodeParams(node, outputsByNodeId);
 
-            response = await fetch(buildHeliusJsonRpcUrl(apiKeyValue, network), {
+            response = await fetch(buildHeliusJsonRpcUrl(apiKeyValue, network, gatekeeperEnabled), {
               method: "POST",
               headers: {
                 "content-type": "application/json",
@@ -999,6 +1013,9 @@ export default function HomePage() {
               >
                 <option value="mainnet">Mainnet</option>
                 <option value="devnet">Devnet</option>
+                <option value="testnet" disabled={gatekeeperEnabled}>
+                  Testnet
+                </option>
               </select>
             </div>
           </div>
@@ -1156,6 +1173,28 @@ export default function HomePage() {
                 aria-label="Open node map"
               >
                 <MapIcon className="h-3.5 w-3.5" />
+              </Button>
+            </QuickTooltip>
+            <QuickTooltip
+              content={
+                gatekeeperEnabled
+                  ? "Gatekeeper enabled. JSON-RPC uses https://beta.helius-rpc.com."
+                  : "Gatekeeper disabled."
+              }
+            >
+              <Button
+                size="sm"
+                variant="outline"
+                className={gatekeeperEnabled ? "h-8 px-3 border-primary text-primary" : "h-8 px-3 text-foreground/60"}
+                onClick={() => setGatekeeperEnabled((value) => !value)}
+                aria-label="Toggle Gatekeeper endpoint"
+              >
+                {gatekeeperEnabled ? (
+                  <ToggleRight className="h-3.5 w-3.5 text-primary" />
+                ) : (
+                  <ToggleLeft className="h-3.5 w-3.5 text-foreground/50" />
+                )}
+                (New) Gatekeeper ✨
               </Button>
             </QuickTooltip>
             <QuickTooltip content="Help me build">
