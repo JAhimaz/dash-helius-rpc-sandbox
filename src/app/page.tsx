@@ -880,15 +880,16 @@ export default function HomePage() {
             }
 
             const httpParams = getNodeHttpParams(node, outputsByNodeId);
+            const shouldUsePost = gatekeeperEnabled || methodEntry.http.method === "POST";
             const url = buildHeliusHttpUrl(
               apiKeyValue,
               network,
               methodEntry,
               httpParams,
-              methodEntry.http.method === "GET",
+              !shouldUsePost,
             );
 
-            if (methodEntry.http.method === "POST") {
+            if (shouldUsePost) {
               response = await fetch(url, {
                 method: "POST",
                 headers: {
