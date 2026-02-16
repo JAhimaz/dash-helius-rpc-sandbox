@@ -3976,6 +3976,207 @@
       ]
     },
     {
+      "method": "getTransactionsForAddress",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/gettransactionsforaddress",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "address",
+            "type": "string",
+            "required": true,
+            "description": "Base-58 encoded public key of the account to query transaction history for."
+          },
+          {
+            "name": "transactionDetails",
+            "type": "string",
+            "required": false,
+            "description": "Level of transaction detail to return. signatures (default) or full (limit <= 100)."
+          },
+          {
+            "name": "sortOrder",
+            "type": "string",
+            "required": false,
+            "description": "Sort order for results. desc (newest first) or asc (oldest first)."
+          },
+          {
+            "name": "limit",
+            "type": "number",
+            "required": false,
+            "description": "Maximum transactions to return. Up to 1000 for signatures mode or up to 100 for full mode."
+          },
+          {
+            "name": "paginationToken",
+            "type": "string",
+            "required": false,
+            "description": "Pagination token from previous response in slot:position format."
+          },
+          {
+            "name": "commitment",
+            "type": "string",
+            "required": false,
+            "description": "Commitment level for the request. confirmed | finalized (processed not supported)."
+          },
+          {
+            "name": "filters.slot",
+            "type": "object",
+            "required": false,
+            "description": "Filter by slot using comparison operators: gte, gt, lte, lt."
+          },
+          {
+            "name": "filters.blockTime",
+            "type": "object",
+            "required": false,
+            "description": "Filter by Unix timestamp using comparison operators: gte, gt, lte, lt, eq."
+          },
+          {
+            "name": "filters.signature",
+            "type": "object",
+            "required": false,
+            "description": "Filter by signature using comparison operators: gte, gt, lte, lt."
+          },
+          {
+            "name": "filters.status",
+            "type": "string",
+            "required": false,
+            "description": "Filter by status: succeeded, failed, or any."
+          },
+          {
+            "name": "filters.tokenAccounts",
+            "type": "string",
+            "required": false,
+            "description": "Include token account activity: none (default), balanceChanged, or all."
+          },
+          {
+            "name": "encoding",
+            "type": "string",
+            "required": false,
+            "description": "Encoding for transaction payloads when transactionDetails is full. json | jsonParsed | base64 | base58."
+          },
+          {
+            "name": "maxSupportedTransactionVersion",
+            "type": "number",
+            "required": false,
+            "description": "Maximum transaction version to return. Set to 0 to include versioned transactions."
+          },
+          {
+            "name": "minContextSlot",
+            "type": "number",
+            "required": false,
+            "description": "The minimum slot that the request can be evaluated at."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "result": {
+            "data": [
+              {
+                "signature": "5h6xBEauJ3PK6SWCZ1PGjBvj8vDdWG3KpwATGy1ARAXFSDwt8GFXM7W5Ncn16wmqokgpiKRLuS83KUxyZyv2sUYv",
+                "slot": 1054,
+                "transactionIndex": 42,
+                "err": null,
+                "memo": null,
+                "blockTime": 1641038400,
+                "confirmationStatus": "finalized"
+              }
+            ],
+            "paginationToken": "1055:5"
+          }
+        }
+      },
+      "errors": [
+        {
+          "httpStatus": 400,
+          "code": -32602,
+          "message": "Invalid params",
+          "description": "Bad Request - Invalid request parameters or malformed request.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32602,
+              "message": "Invalid params"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 401,
+          "code": -32001,
+          "message": "Unauthorized",
+          "description": "Unauthorized - Invalid or missing API key.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32001,
+              "message": "Unauthorized"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 429,
+          "code": -32005,
+          "message": "Too many requests",
+          "description": "Too Many Requests - Rate limit exceeded.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32005,
+              "message": "Too many requests"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 500,
+          "code": -32603,
+          "message": "Internal error",
+          "description": "Internal Server Error - An error occurred on the server.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32603,
+              "message": "Internal error"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 503,
+          "code": -32002,
+          "message": "Service unavailable",
+          "description": "Service Unavailable - The service is temporarily unavailable.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32002,
+              "message": "Service unavailable"
+            },
+            "id": "1"
+          }
+        },
+        {
+          "httpStatus": 504,
+          "code": -32003,
+          "message": "Gateway timeout",
+          "description": "Gateway Timeout - The request timed out.",
+          "example": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32003,
+              "message": "Gateway timeout"
+            },
+            "id": "1"
+          }
+        }
+      ]
+    },
+    {
       "method": "getTransactionCount",
       "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/gettransactioncount",
       "schema": "known",

@@ -977,14 +977,14 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(232,65,37,0.16),transparent_42%),linear-gradient(180deg,#090909_0%,#0f0f10_100%)] p-6 text-foreground">
+    <div className="min-h-screen p-6 text-foreground">
       <div className="mx-auto max-w-6xl space-y-6">
         <header>
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <PanelRightClose className="h-8 w-8 text-primary" />
               <h1 className="text-[1.5rem] font-bold tracking-wide text-primary">DASH</h1>
-              <span className="text-sm text-foreground/50">Helius Workflow Builder</span>
+              <span className="text-sm text-foreground/50">Solana Workflow Builder</span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -995,7 +995,7 @@ export default function HomePage() {
                 id="network-select"
                 value={network}
                 onChange={(event) => setNetwork(event.target.value as RpcNetwork)}
-                className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                className="h-9 rounded-md border border-border px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
               >
                 <option value="mainnet">Mainnet</option>
                 <option value="devnet">Devnet</option>
@@ -1004,7 +1004,7 @@ export default function HomePage() {
           </div>
         </header>
 
-        <section className="rounded-xl border border-border bg-background/80 p-4 shadow-lg shadow-black/25 backdrop-blur">
+        <section className="panel-surface rounded-xl p-4">
           <button
             type="button"
             className="flex w-full items-center justify-between rounded-md px-1 py-1 text-left transition-colors duration-150 cursor-pointer"
@@ -1027,7 +1027,7 @@ export default function HomePage() {
           >
             <div className="overflow-hidden">
               <div id="tutorial-panel" className="mt-3 grid gap-4 text-sm text-foreground/80">
-                <div className="rounded-lg border border-border bg-background/60 p-3">
+                <div className="panel-tile rounded-lg p-3">
                   <p className="mb-2 text-xs font-semibold tracking-wide text-primary">1. Configure Access</p>
                   <ol className="list-inside list-decimal space-y-1">
                     <li>Paste your Helius API key in the field below this tutorial.</li>
@@ -1036,7 +1036,7 @@ export default function HomePage() {
                   </ol>
                 </div>
 
-                <div className="rounded-lg border border-border bg-background/60 p-3">
+                <div className="panel-tile rounded-lg p-3">
                   <p className="mb-2 text-xs font-semibold tracking-wide text-primary">2. Build Nodes</p>
                   <ol className="list-inside list-decimal space-y-1">
                     <li>Click `Add Node`, search a method, and insert it into the workflow.</li>
@@ -1045,7 +1045,7 @@ export default function HomePage() {
                   </ol>
                 </div>
 
-                <div className="rounded-lg border border-border bg-background/60 p-3">
+                <div className="panel-tile rounded-lg p-3">
                   <p className="mb-2 text-xs font-semibold tracking-wide text-primary">3. Set Parameters</p>
                   <ol className="list-inside list-decimal space-y-1">
                     <li>For known schemas, fill fields in the Input pane using JSON literals.</li>
@@ -1054,7 +1054,7 @@ export default function HomePage() {
                   </ol>
                 </div>
 
-                <div className="rounded-lg border border-border bg-background/60 p-3">
+                <div className="panel-tile rounded-lg p-3">
                   <p className="mb-2 text-xs font-semibold tracking-wide text-primary">4. Execute and Inspect</p>
                   <ol className="list-inside list-decimal space-y-1">
                     <li>Run a single node with `Run Node` or a sequence with `Run From Here`.</li>
@@ -1063,7 +1063,7 @@ export default function HomePage() {
                   </ol>
                 </div>
 
-                <div className="rounded-lg border border-border bg-background/60 p-3">
+                <div className="panel-tile rounded-lg p-3">
                   <p className="mb-2 text-xs font-semibold tracking-wide text-primary">5. Troubleshooting</p>
                   <ol className="list-inside list-decimal space-y-1">
                     <li>If you get `Invalid params`, check the parameter order and type for that method.</li>
@@ -1072,7 +1072,7 @@ export default function HomePage() {
                   </ol>
                 </div>
 
-                <div className="rounded-lg border border-border bg-background/60 p-3">
+                <div className="panel-tile rounded-lg p-3">
                   <p className="mb-2 text-xs font-semibold tracking-wide text-primary">6. Save and Share</p>
                   <ol className="list-inside list-decimal space-y-1">
                     <li>Export workflow JSON to checkpoint your setup before major changes.</li>
@@ -1085,7 +1085,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="rounded-xl border border-border bg-background/80 p-4 shadow-lg shadow-black/25 backdrop-blur">
+        <section className="panel-surface rounded-xl p-4">
           <div className="flex flex-wrap items-end gap-4">
             <div className="min-w-64 flex-1">
               <label className="mb-2 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-foreground/65"><KeyRound className="mr-1 h-3 w-3 text-primary" />Helius API Key</label>
@@ -1204,7 +1204,7 @@ export default function HomePage() {
           >
             <div className="overflow-hidden">
               <section
-                className={`w-full rounded-xl border border-border bg-background/80 p-4 shadow-lg shadow-black/25 backdrop-blur transition-transform duration-300 ease-in-out ${showBotPanel ? "translate-y-0" : "-translate-y-2"}`}
+                className={`panel-surface w-full rounded-xl p-4 transition-transform duration-300 ease-in-out ${showBotPanel ? "translate-y-0" : "-translate-y-2"}`}
               >
                 <div className="space-y-3">
                   <div className="h-[220px] space-y-3 overflow-y-auto px-1 py-2">
@@ -1288,7 +1288,7 @@ export default function HomePage() {
         </div>
 
         {showMethodPicker ? (
-          <section className="rounded-xl border border-border bg-background/80 p-4 shadow-lg shadow-black/25 backdrop-blur">
+        <section className="panel-surface rounded-xl border border-border p-4">
             <div className="space-y-3">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-foreground/50" />

@@ -395,7 +395,7 @@ export async function POST(request: Request): Promise<Response> {
         : "rawParams",
   }));
   const useMcp = shouldUseMcp(lastUserMessage, mode);
-  const systemPrompt = `You are a helpful assistant for building Helius workflows.
+  const systemPrompt = `You are a helpful assistant for building Solana workflows.
 ${useMcp ? "Use Helius MCP tools when needed to disambiguate methods." : "Use only the local available methods below."}
 
 You must respond with JSON only, with this shape:

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "DASH - Helius Workflow Builder",
+  title: "DASH - Solana Workflow Builder",
   description: "Internal workflow builder for Helius RPC HTTP methods.",
   icons: {
     icon: "/icon.svg",
