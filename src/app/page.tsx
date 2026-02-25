@@ -1,26 +1,26 @@
 "use client";
 
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   BotMessageSquare,
   BookOpen,
   ChevronDown,
   KeyRound,
-  Map as MapIcon,
-  MessageSquareX,
   PanelRightClose,
   Play,
   Plus,
+  RotateCcw,
   Send,
   Search,
+  Square,
   StepForward,
   ToggleLeft,
   ToggleRight,
 } from "lucide-react";
 
 import { ImportExport } from "@/components/ImportExport";
-import { NodeMapModal } from "@/components/NodeMapModal";
-import { NodeCard } from "@/components/NodeCard";
+import { NodeGraphCanvas, type NodeGraphConnection } from "@/components/NodeGraphCanvas";
+import { NodeSettingsDialog } from "@/components/NodeSettingsDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { QuickTooltip } from "@/components/ui/quick-tooltip";
@@ -32,7 +32,7 @@ import {
 } from "@/lib/methodRegistry";
 import { getByPath } from "@/lib/path";
 import { useWorkflowStore } from "@/store/workflowStore";
-import type { WorkflowNode } from "@/store/workflowStore";
+import type { RepeatUnit, WorkflowNode } from "@/store/workflowStore";
 
 type RpcNetwork = "mainnet" | "devnet" | "testnet";
 
@@ -73,10 +73,13 @@ interface ChatResponsePayload {
 
 interface RunRangeResult {
   success: boolean;
+  canceled?: boolean;
   failedNodeId?: string;
   failedNodeName?: string;
   errorMessage?: string;
 }
+
+type PlannedCallCount = number | null;
 
 function readNonEmptyString(value: unknown): string | undefined {
   if (typeof value !== "string") {
@@ -446,6 +449,273 @@ function getCustomNodeOutput(node: WorkflowNode, outputsByNodeId: Map<string, un
   return resolveParamValue(valueParam.value, outputsByNodeId);
 }
 
+function referencesAnyNode(node: WorkflowNode, nodeIds: Set<string>): boolean {
+  return node.params.some((param) => param.value.type === "ref" && nodeIds.has(param.value.nodeId));
+}
+
+function buildReferenceAdjacency(
+  nodeIds: string[],
+  nodes: Record<string, WorkflowNode>,
+): Map<string, Set<string>> {
+  const nodeIdSet = new Set<string>(nodeIds);
+  const adjacency = new Map<string, Set<string>>();
+
+  for (const nodeId of nodeIds) {
+    const node = nodes[nodeId];
+    if (!node) {
+      continue;
+    }
+
+    for (const param of node.params) {
+      if (param.value.type !== "ref") {
+        continue;
+      }
+
+      const sourceNodeId = param.value.nodeId;
+      if (!nodeIdSet.has(sourceNodeId)) {
+        continue;
+      }
+
+      const targets = adjacency.get(sourceNodeId) ?? new Set<string>();
+      targets.add(node.id);
+      adjacency.set(sourceNodeId, targets);
+    }
+  }
+
+  return adjacency;
+}
+
+function hasReferencePath(
+  adjacency: Map<string, Set<string>>,
+  fromNodeId: string,
+  toNodeId: string,
+): boolean {
+  if (fromNodeId === toNodeId) {
+    return true;
+  }
+
+  const visited = new Set<string>();
+  const stack: string[] = [fromNodeId];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current || visited.has(current)) {
+      continue;
+    }
+
+    visited.add(current);
+    const next = adjacency.get(current);
+    if (!next) {
+      continue;
+    }
+
+    for (const candidate of next) {
+      if (candidate === toNodeId) {
+        return true;
+      }
+      if (!visited.has(candidate)) {
+        stack.push(candidate);
+      }
+    }
+  }
+
+  return false;
+}
+
+function wouldCreateReferenceCycle(
+  nodes: Record<string, WorkflowNode>,
+  targetNodeId: string,
+  sourceNodeId: string,
+): boolean {
+  if (targetNodeId === sourceNodeId) {
+    return true;
+  }
+
+  const nodeIds = Object.keys(nodes);
+  const adjacency = buildReferenceAdjacency(nodeIds, nodes);
+  return hasReferencePath(adjacency, targetNodeId, sourceNodeId);
+}
+
+function buildDependencyExecutionOrder(
+  order: string[],
+  nodes: Record<string, WorkflowNode>,
+): { orderedNodeIds: string[]; hasCycle: boolean } {
+  const orderedNodeIds = order.filter((nodeId) => Boolean(nodes[nodeId]));
+  const indexByNodeId = new Map<string, number>(
+    orderedNodeIds.map((nodeId, index) => [nodeId, index]),
+  );
+  const adjacency = buildReferenceAdjacency(orderedNodeIds, nodes);
+  const indegreeByNodeId = new Map<string, number>(orderedNodeIds.map((nodeId) => [nodeId, 0]));
+
+  for (const targets of adjacency.values()) {
+    for (const targetNodeId of targets) {
+      indegreeByNodeId.set(targetNodeId, (indegreeByNodeId.get(targetNodeId) ?? 0) + 1);
+    }
+  }
+
+  const queue: string[] = orderedNodeIds.filter((nodeId) => (indegreeByNodeId.get(nodeId) ?? 0) === 0);
+  queue.sort((a, b) => (indexByNodeId.get(a) ?? 0) - (indexByNodeId.get(b) ?? 0));
+
+  const result: string[] = [];
+  while (queue.length > 0) {
+    const nodeId = queue.shift();
+    if (!nodeId) {
+      continue;
+    }
+
+    result.push(nodeId);
+    const targets = adjacency.get(nodeId);
+    if (!targets) {
+      continue;
+    }
+
+    for (const targetNodeId of targets) {
+      const nextInDegree = (indegreeByNodeId.get(targetNodeId) ?? 0) - 1;
+      indegreeByNodeId.set(targetNodeId, nextInDegree);
+
+      if (nextInDegree === 0) {
+        queue.push(targetNodeId);
+      }
+    }
+
+    queue.sort((a, b) => (indexByNodeId.get(a) ?? 0) - (indexByNodeId.get(b) ?? 0));
+  }
+
+  return {
+    orderedNodeIds: result.length === orderedNodeIds.length ? result : orderedNodeIds,
+    hasCycle: result.length !== orderedNodeIds.length,
+  };
+}
+
+function getReferencedDownstreamNodeIds(
+  executionOrder: string[],
+  nodes: Record<string, WorkflowNode>,
+  sourceNodeId: string,
+  includedNodeIds: Set<string>,
+): string[] {
+  const sourceIds = new Set<string>([sourceNodeId]);
+  const referencedNodeIds: string[] = [];
+
+  for (const nodeId of executionOrder) {
+    if (!includedNodeIds.has(nodeId) || nodeId === sourceNodeId) {
+      continue;
+    }
+
+    const node = nodes[nodeId];
+
+    if (!node || !referencesAnyNode(node, sourceIds)) {
+      continue;
+    }
+
+    sourceIds.add(nodeId);
+    referencedNodeIds.push(nodeId);
+  }
+
+  return referencedNodeIds;
+}
+
+function repeatIntervalToMs(interval: number, unit: RepeatUnit): number {
+  if (unit === "minutes") {
+    return interval * 60_000;
+  }
+  if (unit === "seconds") {
+    return interval * 1_000;
+  }
+  return interval;
+}
+
+function sleepWithSignal(durationMs: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new DOMException("Execution stopped.", "AbortError"));
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, durationMs);
+
+    const onAbort = () => {
+      window.clearTimeout(timeoutId);
+      signal.removeEventListener("abort", onAbort);
+      reject(new DOMException("Execution stopped.", "AbortError"));
+    };
+
+    signal.addEventListener("abort", onAbort);
+  });
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+function addPlannedCallCount(
+  callCountsByNodeId: Map<string, PlannedCallCount>,
+  nodeId: string,
+  count: number,
+): void {
+  const existing = callCountsByNodeId.get(nodeId);
+  if (existing === null) {
+    return;
+  }
+  if (existing === undefined) {
+    callCountsByNodeId.set(nodeId, count);
+    return;
+  }
+  callCountsByNodeId.set(nodeId, existing + count);
+}
+
+function setPlannedCallCountInfinite(callCountsByNodeId: Map<string, PlannedCallCount>, nodeId: string): void {
+  callCountsByNodeId.set(nodeId, null);
+}
+
+function calculatePlannedCallCounts(
+  executionOrder: string[],
+  nodes: Record<string, WorkflowNode>,
+  includedNodeIds: Set<string>,
+): Map<string, PlannedCallCount> {
+  const callCountsByNodeId = new Map<string, PlannedCallCount>();
+  const skippedNodeIds = new Set<string>();
+
+  for (const nodeId of executionOrder) {
+    if (!includedNodeIds.has(nodeId) || skippedNodeIds.has(nodeId)) {
+      continue;
+    }
+
+    const node = nodes[nodeId];
+    if (!node) {
+      continue;
+    }
+
+    if (!node.repeat.enabled) {
+      addPlannedCallCount(callCountsByNodeId, nodeId, 1);
+      continue;
+    }
+
+    const downstreamNodeIds = getReferencedDownstreamNodeIds(executionOrder, nodes, nodeId, includedNodeIds);
+    const repeatCount = Math.max(1, Math.floor(node.repeat.count));
+    const loopCount = Math.max(0, Math.floor(node.repeat.loopCount));
+
+    if (loopCount === 0) {
+      setPlannedCallCountInfinite(callCountsByNodeId, nodeId);
+      for (const downstreamNodeId of downstreamNodeIds) {
+        setPlannedCallCountInfinite(callCountsByNodeId, downstreamNodeId);
+      }
+      break;
+    }
+
+    const totalCalls = repeatCount * loopCount;
+    addPlannedCallCount(callCountsByNodeId, nodeId, totalCalls);
+    for (const downstreamNodeId of downstreamNodeIds) {
+      addPlannedCallCount(callCountsByNodeId, downstreamNodeId, totalCalls);
+      skippedNodeIds.add(downstreamNodeId);
+    }
+  }
+
+  return callCountsByNodeId;
+}
+
 export default function HomePage() {
   const apiKey = useWorkflowStore((state) => state.apiKey);
   const order = useWorkflowStore((state) => state.order);
@@ -458,12 +728,12 @@ export default function HomePage() {
   const removeNode = useWorkflowStore((state) => state.removeNode);
   const renameNode = useWorkflowStore((state) => state.renameNode);
   const selectNode = useWorkflowStore((state) => state.selectNode);
-  const reorderNodes = useWorkflowStore((state) => state.reorderNodes);
+  const setNodePosition = useWorkflowStore((state) => state.setNodePosition);
   const setParamValue = useWorkflowStore((state) => state.setParamValue);
   const setRawParamsJson = useWorkflowStore((state) => state.setRawParamsJson);
+  const setNodeRepeat = useWorkflowStore((state) => state.setNodeRepeat);
   const setNodeStatus = useWorkflowStore((state) => state.setNodeStatus);
   const setNodeOutput = useWorkflowStore((state) => state.setNodeOutput);
-  const toggleOutputOpen = useWorkflowStore((state) => state.toggleOutputOpen);
   const clearOutputs = useWorkflowStore((state) => state.clearOutputs);
   const exportWorkflow = useWorkflowStore((state) => state.exportWorkflow);
   const importWorkflow = useWorkflowStore((state) => state.importWorkflow);
@@ -472,7 +742,6 @@ export default function HomePage() {
   const [isExecuting, setIsExecuting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string>("");
   const [showMethodPicker, setShowMethodPicker] = useState(false);
-  const [showNodeMap, setShowNodeMap] = useState(false);
   const [showBotPanel, setShowBotPanel] = useState(false);
   const [isBotReplying, setIsBotReplying] = useState(false);
   const [isBotTesting, setIsBotTesting] = useState(false);
@@ -481,11 +750,14 @@ export default function HomePage() {
   const [methodQuery, setMethodQuery] = useState("");
   const [selectedMethodCategoryId, setSelectedMethodCategoryId] = useState<MethodCategoryId>("solana-rpc-apis");
   const [selectedMethod, setSelectedMethod] = useState<string>();
-  const [draggingNodeId, setDraggingNodeId] = useState<string>();
+  const [editingNodeId, setEditingNodeId] = useState<string>();
   const [showInstructions, setShowInstructions] = useState(false);
   const [network, setNetwork] = useState<RpcNetwork>("mainnet");
   const [gatekeeperEnabled, setGatekeeperEnabled] = useState(false);
   const [hasLoadedApiKeyFromSession, setHasLoadedApiKeyFromSession] = useState(false);
+  const [nodeCallCounts, setNodeCallCounts] = useState<Record<string, number>>({});
+  const [nodeCallTargets, setNodeCallTargets] = useState<Record<string, PlannedCallCount>>({});
+  const activeExecutionAbortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (gatekeeperEnabled && network === "testnet") {
@@ -514,10 +786,114 @@ export default function HomePage() {
     window.sessionStorage.removeItem(SESSION_STORAGE_API_KEY);
   }, [apiKey, hasLoadedApiKeyFromSession]);
 
+  useEffect(() => {
+    if (!editingNodeId) {
+      return;
+    }
+
+    if (nodes[editingNodeId]) {
+      return;
+    }
+
+    setEditingNodeId(undefined);
+  }, [editingNodeId, nodes]);
+
   const orderedNodes = useMemo(
     () => order.map((nodeId) => nodes[nodeId]).filter((node): node is WorkflowNode => Boolean(node)),
     [order, nodes],
   );
+  const dependencyExecutionPlan = useMemo(
+    () => buildDependencyExecutionOrder(order, nodes),
+    [order, nodes],
+  );
+  const executionOrderByNodeId = useMemo<Record<string, number | null>>(() => {
+    const orderByNodeId: Record<string, number | null> = {};
+
+    for (const node of orderedNodes) {
+      orderByNodeId[node.id] = dependencyExecutionPlan.hasCycle ? null : 0;
+    }
+
+    if (!dependencyExecutionPlan.hasCycle) {
+      dependencyExecutionPlan.orderedNodeIds.forEach((nodeId, index) => {
+        orderByNodeId[nodeId] = index + 1;
+      });
+    }
+
+    return orderByNodeId;
+  }, [dependencyExecutionPlan, orderedNodes]);
+  const defaultPlannedCallCounts = useMemo(
+    () =>
+      calculatePlannedCallCounts(
+        dependencyExecutionPlan.orderedNodeIds,
+        nodes,
+        new Set(dependencyExecutionPlan.orderedNodeIds),
+      ),
+    [dependencyExecutionPlan, nodes],
+  );
+  const graphConnections = useMemo<NodeGraphConnection[]>(() => {
+    const connections: NodeGraphConnection[] = [];
+
+    for (const node of orderedNodes) {
+      for (const param of node.params) {
+        if (param.value.type !== "ref") {
+          continue;
+        }
+
+        connections.push({
+          id: `${param.value.nodeId}-${node.id}-${param.name}-${param.value.path}-${connections.length}`,
+          fromNodeId: param.value.nodeId,
+          toNodeId: node.id,
+          paramName: param.name,
+          path: param.value.path,
+        });
+      }
+    }
+
+    return connections;
+  }, [orderedNodes]);
+  const callTargetByNodeId = useMemo<Record<string, number | null>>(() => {
+    const targets: Record<string, number | null> = {};
+
+    for (const node of orderedNodes) {
+      const hasRunSpecificTarget = Object.prototype.hasOwnProperty.call(nodeCallTargets, node.id);
+      if (hasRunSpecificTarget) {
+        targets[node.id] = nodeCallTargets[node.id] ?? null;
+        continue;
+      }
+
+      if (defaultPlannedCallCounts.has(node.id)) {
+        targets[node.id] = defaultPlannedCallCounts.get(node.id) ?? null;
+        continue;
+      }
+
+      targets[node.id] = 0;
+    }
+
+    return targets;
+  }, [defaultPlannedCallCounts, nodeCallTargets, orderedNodes]);
+  const editingNode = useMemo(
+    () => (editingNodeId ? nodes[editingNodeId] : undefined),
+    [editingNodeId, nodes],
+  );
+  const editingNodeIndex = useMemo(
+    () => (editingNode ? order.indexOf(editingNode.id) : -1),
+    [editingNode, order],
+  );
+  const editingNodeSourceNodes = useMemo(() => {
+    if (!editingNode) {
+      return [];
+    }
+
+    return orderedNodes
+      .filter((candidate) => candidate.id !== editingNode.id)
+      .filter((candidate) => candidate.output !== undefined)
+      .filter((candidate) => !wouldCreateReferenceCycle(nodes, editingNode.id, candidate.id))
+      .map((candidate) => ({
+        id: candidate.id,
+        name: candidate.name,
+        output: candidate.output,
+      }));
+  }, [editingNode, nodes, orderedNodes]);
 
   const methodEntries = useMemo(() => getMethodEntries(), []);
   const methodCategories = useMemo<MethodCategory[]>(
@@ -756,6 +1132,8 @@ export default function HomePage() {
 
             if (initialRun.success) {
               assistantReply += " Validation passed.";
+            } else if (initialRun.canceled) {
+              assistantReply += " Validation was stopped.";
             } else {
               const workflowState = useWorkflowStore.getState();
               const recentNodes = createdNodeIds
@@ -798,9 +1176,13 @@ export default function HomePage() {
                 clearOutputs();
                 const repairRun = await runRange(0, useWorkflowStore.getState().order.length);
 
-                assistantReply += repairRun.success
-                  ? " Initial validation failed, then auto-correction succeeded."
-                  : ` Auto-correction attempted but still failed at ${repairRun.failedNodeName ?? "a node"}: ${repairRun.errorMessage ?? "unknown error"}.`;
+                if (repairRun.success) {
+                  assistantReply += " Initial validation failed, then auto-correction succeeded.";
+                } else if (repairRun.canceled) {
+                  assistantReply += " Auto-correction validation was stopped.";
+                } else {
+                  assistantReply += ` Auto-correction attempted but still failed at ${repairRun.failedNodeName ?? "a node"}: ${repairRun.errorMessage ?? "unknown error"}.`;
+                }
               } else {
                 assistantReply += ` Validation failed and no safe correction plan was available: ${repairData.availabilityError ?? "unknown reason"}.`;
               }
@@ -826,159 +1208,313 @@ export default function HomePage() {
     }
   };
 
+  const executeSingleNode = async (
+    nodeId: string,
+    outputsByNodeId: Map<string, unknown>,
+    signal: AbortSignal,
+  ): Promise<RunRangeResult> => {
+    const node = useWorkflowStore.getState().nodes[nodeId];
+    if (!node) {
+      return { success: true };
+    }
+
+    if (signal.aborted) {
+      return {
+        success: false,
+        canceled: true,
+        failedNodeId: node.id,
+        failedNodeName: node.name,
+        errorMessage: "Execution stopped by user.",
+      };
+    }
+
+    setNodeCallCounts((prev) => ({
+      ...prev,
+      [node.id]: (prev[node.id] ?? 0) + 1,
+    }));
+    setNodeStatus(node.id, "running");
+
+    try {
+      const methodEntry = getMethodEntry(node.method);
+      const transport = methodEntry?.transport ?? "jsonrpc";
+      const apiKeyValue = useWorkflowStore.getState().apiKey;
+
+      let response: Response;
+
+      if (transport === "custom") {
+        const output = getCustomNodeOutput(node, outputsByNodeId);
+        setNodeOutput(node.id, output);
+        outputsByNodeId.set(node.id, output);
+        setNodeStatus(node.id, "success");
+        return { success: true };
+      }
+
+      if (transport === "http") {
+        if (!methodEntry?.http) {
+          throw new Error(`Method ${node.method} is marked as HTTP but has no HTTP config.`);
+        }
+
+        const httpParams = getNodeHttpParams(node, outputsByNodeId);
+        const shouldUsePost = gatekeeperEnabled || methodEntry.http.method === "POST";
+        const url = buildHeliusHttpUrl(apiKeyValue, network, methodEntry, httpParams, !shouldUsePost);
+
+        if (shouldUsePost) {
+          response = await fetch(url, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+            },
+            body: JSON.stringify(httpParams),
+            signal,
+          });
+        } else {
+          response = await fetch(url, {
+            method: "GET",
+            signal,
+          });
+        }
+      } else {
+        const params = getNodeParams(node, outputsByNodeId);
+
+        response = await fetch(buildHeliusJsonRpcUrl(apiKeyValue, network, gatekeeperEnabled), {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: "1",
+            method: node.method,
+            params,
+          }),
+          signal,
+        });
+      }
+
+      const text = await response.text();
+      const parsed = parseRpcResponse(text);
+      setNodeOutput(node.id, parsed);
+
+      if (!response.ok) {
+        const message =
+          typeof parsed === "object" && parsed !== null && "error" in parsed
+            ? String((parsed as { error: unknown }).error)
+            : `Request failed with status ${response.status}`;
+        setNodeStatus(node.id, "error", message);
+        return {
+          success: false,
+          failedNodeId: node.id,
+          failedNodeName: node.name,
+          errorMessage: message,
+        };
+      }
+
+      if (typeof parsed === "object" && parsed !== null && "error" in parsed) {
+        const rpcError = (parsed as { error?: unknown }).error;
+        const message = typeof rpcError === "string" ? rpcError : JSON.stringify(rpcError);
+        setNodeStatus(node.id, "error", message);
+        return {
+          success: false,
+          failedNodeId: node.id,
+          failedNodeName: node.name,
+          errorMessage: message,
+        };
+      }
+
+      outputsByNodeId.set(node.id, parsed);
+      setNodeStatus(node.id, "success");
+      return { success: true };
+    } catch (error) {
+      if (isAbortError(error)) {
+        setNodeStatus(node.id, "idle");
+        return {
+          success: false,
+          canceled: true,
+          failedNodeId: node.id,
+          failedNodeName: node.name,
+          errorMessage: "Execution stopped by user.",
+        };
+      }
+
+      const message = error instanceof Error ? error.message : "Unknown execution error";
+      setNodeStatus(node.id, "error", message);
+      return {
+        success: false,
+        failedNodeId: node.id,
+        failedNodeName: node.name,
+        errorMessage: message,
+      };
+    }
+  };
+
   const runRange = async (startIndex: number, endIndexExclusive: number): Promise<RunRangeResult> => {
-    if (startIndex < 0) {
+    const state = useWorkflowStore.getState();
+    const orderSnapshot = [...state.order];
+    const boundedEnd = Math.min(endIndexExclusive, orderSnapshot.length);
+    const executionController = new AbortController();
+    activeExecutionAbortControllerRef.current = executionController;
+
+    if (startIndex < 0 || startIndex > boundedEnd) {
       return {
         success: false,
         errorMessage: "Invalid start index for execution.",
       };
     }
 
-    let runResult: RunRangeResult = { success: true };
-    const currentState = useWorkflowStore.getState();
-    const outputsByNodeId = new Map<string, unknown>();
+    const dependencyPlan = buildDependencyExecutionOrder(orderSnapshot, state.nodes);
+    if (dependencyPlan.hasCycle) {
+      setStatusMessage("Circular reference detected. Remove cyclic references before running.");
+      return {
+        success: false,
+        errorMessage: "Circular reference detected. Remove cyclic references before running.",
+      };
+    }
 
-    for (const nodeId of currentState.order) {
-      const output = currentState.nodes[nodeId]?.output;
+    const includedNodeIds = new Set<string>(orderSnapshot.slice(startIndex, boundedEnd));
+    const executionOrder = dependencyPlan.orderedNodeIds.filter((nodeId) => includedNodeIds.has(nodeId));
+    const plannedCallCounts = calculatePlannedCallCounts(executionOrder, state.nodes, includedNodeIds);
+    const initialCallTargets: Record<string, PlannedCallCount> = {};
+    const initialCallCounts: Record<string, number> = {};
+    for (const nodeId of orderSnapshot) {
+      initialCallTargets[nodeId] = plannedCallCounts.get(nodeId) ?? 0;
+      initialCallCounts[nodeId] = 0;
+    }
+    setNodeCallTargets(initialCallTargets);
+    setNodeCallCounts(initialCallCounts);
+
+    const outputsByNodeId = new Map<string, unknown>();
+    for (const nodeId of orderSnapshot) {
+      const output = state.nodes[nodeId]?.output;
       if (output !== undefined) {
         outputsByNodeId.set(nodeId, output);
       }
     }
 
+    const skippedNodeIds = new Set<string>();
     setStatusMessage("");
     setIsExecuting(true);
 
     try {
-      for (let index = startIndex; index < endIndexExclusive; index += 1) {
-        const nodeId = useWorkflowStore.getState().order[index];
-        const node = useWorkflowStore.getState().nodes[nodeId];
+      for (const nodeId of executionOrder) {
+        if (executionController.signal.aborted) {
+          return {
+            success: false,
+            canceled: true,
+            errorMessage: "Execution stopped by user.",
+          };
+        }
 
+        if (skippedNodeIds.has(nodeId)) {
+          continue;
+        }
+
+        const node = useWorkflowStore.getState().nodes[nodeId];
         if (!node) {
           continue;
         }
 
-        setNodeStatus(node.id, "running");
-
-        try {
-          const methodEntry = getMethodEntry(node.method);
-          const transport = methodEntry?.transport ?? "jsonrpc";
-          const apiKeyValue = useWorkflowStore.getState().apiKey;
-
-          let response: Response;
-
-          if (transport === "custom") {
-            const output = getCustomNodeOutput(node, outputsByNodeId);
-            setNodeOutput(node.id, output);
-            outputsByNodeId.set(node.id, output);
-            setNodeStatus(node.id, "success");
-            continue;
-          }
-
-          if (transport === "http") {
-            if (!methodEntry?.http) {
-              throw new Error(`Method ${node.method} is marked as HTTP but has no HTTP config.`);
-            }
-
-            const httpParams = getNodeHttpParams(node, outputsByNodeId);
-            const shouldUsePost = gatekeeperEnabled || methodEntry.http.method === "POST";
-            const url = buildHeliusHttpUrl(
-              apiKeyValue,
-              network,
-              methodEntry,
-              httpParams,
-              !shouldUsePost,
-            );
-
-            if (shouldUsePost) {
-              response = await fetch(url, {
-                method: "POST",
-                headers: {
-                  "content-type": "application/json",
-                },
-                body: JSON.stringify(httpParams),
-              });
+        if (!node.repeat.enabled) {
+          const singleResult = await executeSingleNode(nodeId, outputsByNodeId, executionController.signal);
+          if (!singleResult.success) {
+            if (singleResult.canceled) {
+              setStatusMessage("Execution stopped.");
             } else {
-              response = await fetch(url, {
-                method: "GET",
-              });
+              setStatusMessage(
+                `Execution stopped at ${singleResult.failedNodeName ?? "node"}: ${singleResult.errorMessage ?? "unknown error"}`,
+              );
             }
-          } else {
-            const params = getNodeParams(node, outputsByNodeId);
-
-            response = await fetch(buildHeliusJsonRpcUrl(apiKeyValue, network, gatekeeperEnabled), {
-              method: "POST",
-              headers: {
-                "content-type": "application/json",
-              },
-              body: JSON.stringify({
-                jsonrpc: "2.0",
-                id: "1",
-                method: node.method,
-                params,
-              }),
-            });
+            return singleResult;
           }
+          continue;
+        }
 
-          const text = await response.text();
-          const parsed = parseRpcResponse(text);
+        const downstreamNodeIds = getReferencedDownstreamNodeIds(
+          executionOrder,
+          useWorkflowStore.getState().nodes,
+          nodeId,
+          includedNodeIds,
+        );
+        const repeatCount = Math.max(1, Math.floor(node.repeat.count));
+        const loopCount = Math.max(0, Math.floor(node.repeat.loopCount));
+        const repeatDelayMs = repeatIntervalToMs(Math.max(0, Math.floor(node.repeat.interval)), node.repeat.unit);
+        let globalIteration = 0;
 
-          setNodeOutput(node.id, parsed);
+        for (let cycle = 0; loopCount === 0 || cycle < loopCount; cycle += 1) {
+          for (let iteration = 0; iteration < repeatCount; iteration += 1) {
+            if (globalIteration > 0 && repeatDelayMs > 0) {
+              await sleepWithSignal(repeatDelayMs, executionController.signal);
+            }
 
-          if (!response.ok) {
-            const message =
-              typeof parsed === "object" && parsed !== null && "error" in parsed
-                ? String((parsed as { error: unknown }).error)
-                : `Request failed with status ${response.status}`;
+            const nodeResult = await executeSingleNode(nodeId, outputsByNodeId, executionController.signal);
+            if (!nodeResult.success) {
+              if (nodeResult.canceled) {
+                setStatusMessage("Execution stopped.");
+              } else {
+                setStatusMessage(
+                  `Execution stopped at ${nodeResult.failedNodeName ?? "node"}: ${nodeResult.errorMessage ?? "unknown error"}`,
+                );
+              }
+              return nodeResult;
+            }
 
-            setNodeStatus(node.id, "error", message);
-            setStatusMessage(`Execution stopped at ${node.name}: ${message}`);
-            runResult = {
-              success: false,
-              failedNodeId: node.id,
-              failedNodeName: node.name,
-              errorMessage: message,
-            };
-            break;
+            for (const downstreamNodeId of downstreamNodeIds) {
+              const downstreamResult = await executeSingleNode(downstreamNodeId, outputsByNodeId, executionController.signal);
+              if (!downstreamResult.success) {
+                if (downstreamResult.canceled) {
+                  setStatusMessage("Execution stopped.");
+                } else {
+                  setStatusMessage(
+                    `Execution stopped at ${downstreamResult.failedNodeName ?? "node"}: ${downstreamResult.errorMessage ?? "unknown error"}`,
+                  );
+                }
+                return downstreamResult;
+              }
+            }
+
+            globalIteration += 1;
           }
+        }
 
-          if (typeof parsed === "object" && parsed !== null && "error" in parsed) {
-            const rpcError = (parsed as { error?: unknown }).error;
-            const message = typeof rpcError === "string" ? rpcError : JSON.stringify(rpcError);
-            setNodeStatus(node.id, "error", message);
-            setStatusMessage(`Execution stopped at ${node.name}: ${message}`);
-            runResult = {
-              success: false,
-              failedNodeId: node.id,
-              failedNodeName: node.name,
-              errorMessage: message,
-            };
-            break;
-          }
-
-          outputsByNodeId.set(node.id, parsed);
-          setNodeStatus(node.id, "success");
-        } catch (error) {
-          const message = error instanceof Error ? error.message : "Unknown execution error";
-          setNodeStatus(node.id, "error", message);
-          setStatusMessage(`Execution stopped at ${node.name}: ${message}`);
-          runResult = {
-            success: false,
-            failedNodeId: node.id,
-            failedNodeName: node.name,
-            errorMessage: message,
-          };
-          break;
+        for (const downstreamNodeId of downstreamNodeIds) {
+          skippedNodeIds.add(downstreamNodeId);
         }
       }
+    } catch (error) {
+      if (isAbortError(error)) {
+        return {
+          success: false,
+          canceled: true,
+          errorMessage: "Execution stopped by user.",
+        };
+      }
+      throw error;
     } finally {
+      if (activeExecutionAbortControllerRef.current === executionController) {
+        activeExecutionAbortControllerRef.current = null;
+      }
       setIsExecuting(false);
     }
 
-    return runResult;
+    return { success: true };
   };
 
   const executeAll = async () => {
     await runRange(0, order.length);
+  };
+
+  const stopAllActiveNodes = () => {
+    const controller = activeExecutionAbortControllerRef.current;
+    if (!controller) {
+      return;
+    }
+
+    controller.abort();
+    setStatusMessage("Execution stopped.");
+  };
+
+  const clearExecutionCallStats = () => {
+    setNodeCallCounts({});
+    setNodeCallTargets({});
   };
 
   const executeFromSelected = async () => {
@@ -1049,7 +1585,7 @@ export default function HomePage() {
                   <p className="mb-2 text-xs font-semibold tracking-wide text-primary">1. Configure Access</p>
                   <ol className="list-inside list-decimal space-y-1">
                     <li>Paste your Helius API key in the field below this tutorial.</li>
-                    <li>Use the action icons on the right to run all nodes, run from the selected node, or clear outputs.</li>
+                    <li>Use the action icons on the right to run all nodes, run from the selected node, stop execution, or reset.</li>
                     <li>Use the export and import controls to save your flow and load it back.</li>
                   </ol>
                 </div>
@@ -1058,8 +1594,8 @@ export default function HomePage() {
                   <p className="mb-2 text-xs font-semibold tracking-wide text-primary">2. Build Nodes</p>
                   <ol className="list-inside list-decimal space-y-1">
                     <li>Click `Add Node`, search a method, and insert it into the workflow.</li>
-                    <li>Use drag handle ordering to place nodes in execution order.</li>
-                    <li>Rename each node in the top bar so the flow is readable.</li>
+                    <li>Drag nodes around the graph canvas to organize your flow visually.</li>
+                    <li>Click the gear icon on a node to open settings, outputs, and run controls.</li>
                   </ol>
                 </div>
 
@@ -1075,8 +1611,8 @@ export default function HomePage() {
                 <div className="panel-tile rounded-lg p-3">
                   <p className="mb-2 text-xs font-semibold tracking-wide text-primary">4. Execute and Inspect</p>
                   <ol className="list-inside list-decimal space-y-1">
-                    <li>Run a single node with `Run Node` or a sequence with `Run From Here`.</li>
-                    <li>Open Output to inspect parsed JSON responses and error payloads.</li>
+                    <li>Run a single node with `Run Node` or a sequence with `Run From Here` in node settings.</li>
+                    <li>Use the node settings dialog output pane to inspect responses and errors.</li>
                     <li>Status badges show `idle`, `running`, `success`, or `error` per node.</li>
                   </ol>
                 </div>
@@ -1127,6 +1663,18 @@ export default function HomePage() {
                 <Play className="h-3.5 w-3.5" />
               </Button>
             </QuickTooltip>
+            <QuickTooltip content="Stop all active nodes">
+              <Button
+                size="sm"
+                className="h-8 w-8 p-0"
+                variant="destructive"
+                onClick={stopAllActiveNodes}
+                disabled={!isExecuting}
+                aria-label="Stop all active nodes"
+              >
+                <Square className="h-3.5 w-3.5" />
+              </Button>
+            </QuickTooltip>
             <QuickTooltip content="Execute from current node">
               <Button
                 size="sm"
@@ -1139,16 +1687,19 @@ export default function HomePage() {
                 <StepForward className="h-3.5 w-3.5" />
               </Button>
             </QuickTooltip>
-            <QuickTooltip content="Clear outputs">
+            <QuickTooltip content="Reset">
               <Button
                 size="sm"
                 className="h-8 w-8 p-0"
                 variant="secondary"
-                onClick={clearOutputs}
+                onClick={() => {
+                  clearOutputs();
+                  clearExecutionCallStats();
+                }}
                 disabled={isExecuting || order.length === 0}
-                aria-label="Clear outputs"
+                aria-label="Reset"
               >
-                <MessageSquareX className="h-3.5 w-3.5" />
+                <RotateCcw className="h-3.5 w-3.5" />
               </Button>
             </QuickTooltip>
 
@@ -1165,17 +1716,6 @@ export default function HomePage() {
 
         <div>
           <div className="flex justify-end gap-2">
-            <QuickTooltip content="Open node map">
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 w-8 p-0"
-                onClick={() => setShowNodeMap(true)}
-                aria-label="Open node map"
-              >
-                <MapIcon className="h-3.5 w-3.5" />
-              </Button>
-            </QuickTooltip>
             <QuickTooltip
               content={
                 gatekeeperEnabled
@@ -1259,7 +1799,7 @@ export default function HomePage() {
                           {message.role === "assistant" && message.plan ? (
                             <div className="w-fit max-w-[75%] space-y-1 text-sm leading-6 text-foreground">
                               <p className="text-justify">
-                                In order to achieve "{message.plan.task}", you will have to call the following:
+                                In order to achieve &quot;{message.plan.task}&quot;, you will have to call the following:
                               </p>
                               {message.plan.methods.map((method, methodIndex) => (
                                 <p key={`${method}-${methodIndex}`} className="font-semibold text-primary">
@@ -1327,163 +1867,170 @@ export default function HomePage() {
           </div>
         </div>
 
-        {showMethodPicker ? (
-        <section className="panel-surface rounded-xl border border-border p-4">
-            <div className="space-y-3">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-foreground/50" />
-                <Input
-                  className="pl-8"
-                  value={methodQuery}
-                  onChange={(event) => setMethodQuery(event.target.value)}
-                  placeholder="Search methods in selected category"
-                />
-              </div>
-
-              <div className="grid h-[460px] gap-3 md:grid-cols-3">
-                <div className="min-h-0 rounded-lg border border-border bg-background/60">
-                  <div className="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
-                    Categories
-                  </div>
-                  <div className="h-[calc(460px-37px)] overflow-auto p-2">
-                    <ul className="space-y-1">
-                      {methodCategories.map((category) => (
-                        <li key={category.id}>
-                          <Button
-                            className="w-full justify-start"
-                            variant={selectedCategory?.id === category.id ? "default" : "secondary"}
-                            size="sm"
-                            onClick={() => {
-                              setSelectedMethodCategoryId(category.id);
-                              setSelectedMethod(undefined);
-                            }}
-                            aria-label={`Select ${category.label} category`}
-                          >
-                            <span className="truncate">{category.label}</span>
-                            <span className="ml-auto text-[11px] opacity-80">{category.methods.length}</span>
-                          </Button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+        <div
+          className={`grid transition-[grid-template-rows,opacity,margin-top] duration-300 ease-in-out ${showMethodPicker ? "mt-3 grid-rows-[1fr] opacity-100" : "pointer-events-none mt-0 grid-rows-[0fr] opacity-0"}`}
+          aria-hidden={!showMethodPicker}
+        >
+          <div className="overflow-hidden">
+            <section
+              className={`panel-surface rounded-xl border border-border p-4 transition-transform duration-300 ease-in-out ${showMethodPicker ? "translate-y-0" : "-translate-y-2"}`}
+            >
+              <div className="space-y-3">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-foreground/50" />
+                  <Input
+                    className="pl-8"
+                    value={methodQuery}
+                    onChange={(event) => setMethodQuery(event.target.value)}
+                    placeholder="Search methods in selected category"
+                  />
                 </div>
 
-                <div className="min-h-0 rounded-lg border border-border bg-background/60">
-                  <div className="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
-                    Methods
-                  </div>
-                  <div className="h-[calc(460px-37px)] overflow-auto p-2">
-                    {filteredMethods.length === 0 ? (
-                      <p className="p-2 text-xs text-foreground/65">
-                        {selectedCategory?.methods.length === 0
-                          ? "No methods in this category yet."
-                          : "No methods match your search."}
-                      </p>
-                    ) : (
+                <div className="grid h-[460px] gap-3 md:grid-cols-3">
+                  <div className="min-h-0 rounded-lg border border-border bg-background/60">
+                    <div className="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
+                      Categories
+                    </div>
+                    <div className="h-[calc(460px-37px)] overflow-auto p-2">
                       <ul className="space-y-1">
-                        {filteredMethods.map((method) => (
-                          <li key={method}>
+                        {methodCategories.map((category) => (
+                          <li key={category.id}>
                             <Button
                               className="w-full justify-start"
-                              variant={activeMethod === method ? "default" : "secondary"}
+                              variant={selectedCategory?.id === category.id ? "default" : "secondary"}
                               size="sm"
-                              onClick={() => setSelectedMethod(method)}
-                              aria-label={`Select ${method}`}
+                              onClick={() => {
+                                setSelectedMethodCategoryId(category.id);
+                                setSelectedMethod(undefined);
+                              }}
+                              aria-label={`Select ${category.label} category`}
                             >
-                              <span className="truncate">{method}</span>
+                              <span className="truncate">{category.label}</span>
+                              <span className="ml-auto text-[11px] opacity-80">{category.methods.length}</span>
                             </Button>
                           </li>
                         ))}
                       </ul>
-                    )}
+                    </div>
                   </div>
-                </div>
 
-                <div className="min-h-0 rounded-lg border border-border bg-background/60">
-                  <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-foreground/70">Method Details</span>
-                    <Button
-                      size="sm"
-                      className="h-7 px-2 text-[11px]"
-                      onClick={() => {
-                        if (!activeMethod) {
-                          return;
-                        }
-                        addNode(activeMethod);
-                        setMethodQuery("");
-                        setShowMethodPicker(false);
-                      }}
-                      disabled={!activeMethod}
-                      aria-label={activeMethod ? `Add ${activeMethod} node` : "Add selected method node"}
-                    >
-                      <Plus className="h-3 w-3" />
-                      Add Node
-                    </Button>
+                  <div className="min-h-0 rounded-lg border border-border bg-background/60">
+                    <div className="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-foreground/70">
+                      Methods
+                    </div>
+                    <div className="h-[calc(460px-37px)] overflow-auto p-2">
+                      {filteredMethods.length === 0 ? (
+                        <p className="p-2 text-xs text-foreground/65">
+                          {selectedCategory?.methods.length === 0
+                            ? "No methods in this category yet."
+                            : "No methods match your search."}
+                        </p>
+                      ) : (
+                        <ul className="space-y-1">
+                          {filteredMethods.map((method) => (
+                            <li key={method}>
+                              <Button
+                                className="w-full justify-start"
+                                variant={activeMethod === method ? "default" : "secondary"}
+                                size="sm"
+                                onClick={() => setSelectedMethod(method)}
+                                aria-label={`Select ${method}`}
+                              >
+                                <span className="truncate">{method}</span>
+                              </Button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   </div>
-                  <div className="h-[calc(460px-37px)] overflow-auto p-3">
-                    {!activeMethod ? (
-                      <p className="text-xs text-foreground/65">
-                        Select a method to see input details and add it as a node.
-                      </p>
-                    ) : (
-                      <div className="space-y-3">
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">{activeMethod}</p>
-                          <p className="text-xs text-foreground/65">
-                            Schema: {activeMethodEntry?.schema ?? "unknown"}
-                          </p>
-                          <p className="text-xs text-foreground/65">
-                            Request:{" "}
-                            {activeMethodEntry?.transport === "custom"
-                              ? "Local custom node"
-                              : activeMethodEntry?.transport === "http"
-                              ? `HTTP ${activeMethodEntry.http?.method ?? "GET"}`
-                              : "JSON-RPC POST"}
-                          </p>
-                        </div>
 
-                        {activeMethodEntry?.docsUrl ? (
-                          <a
-                            href={activeMethodEntry.docsUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex text-xs text-primary hover:underline"
-                          >
-                            Open docs
-                          </a>
-                        ) : null}
-
-                        {activeMethodEntry?.params?.kind === "table" ? (
-                          <div className="space-y-2">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-foreground/70">Inputs</p>
-                            <ul className="space-y-2">
-                              {activeMethodEntry.params.fields.map((field) => (
-                                <li key={`${activeMethod}-${field.name}`} className="rounded-md border border-border bg-background/50 p-2">
-                                  <p className="text-xs font-medium text-foreground">{field.name}</p>
-                                  <p className="text-[11px] text-foreground/65">
-                                    {(field.type ?? "unknown").toLowerCase()} / {field.required ? "required" : "optional"}
-                                  </p>
-                                  {field.description ? <p className="mt-1 text-[11px] text-foreground/70">{field.description}</p> : null}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-foreground/70">Inputs</p>
-                            <p className="text-xs text-foreground/70">
-                              This method uses a raw JSON params array in the node editor.
+                  <div className="min-h-0 rounded-lg border border-border bg-background/60">
+                    <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-foreground/70">Method Details</span>
+                      <Button
+                        size="sm"
+                        className="h-7 px-2 text-[11px]"
+                        onClick={() => {
+                          if (!activeMethod) {
+                            return;
+                          }
+                          addNode(activeMethod);
+                          setMethodQuery("");
+                          setShowMethodPicker(false);
+                        }}
+                        disabled={!activeMethod}
+                        aria-label={activeMethod ? `Add ${activeMethod} node` : "Add selected method node"}
+                      >
+                        <Plus className="h-3 w-3" />
+                        Add Node
+                      </Button>
+                    </div>
+                    <div className="h-[calc(460px-37px)] overflow-auto p-3">
+                      {!activeMethod ? (
+                        <p className="text-xs text-foreground/65">
+                          Select a method to see input details and add it as a node.
+                        </p>
+                      ) : (
+                        <div className="space-y-3">
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">{activeMethod}</p>
+                            <p className="text-xs text-foreground/65">
+                              Schema: {activeMethodEntry?.schema ?? "unknown"}
+                            </p>
+                            <p className="text-xs text-foreground/65">
+                              Request:{" "}
+                              {activeMethodEntry?.transport === "custom"
+                                ? "Local custom node"
+                                : activeMethodEntry?.transport === "http"
+                                  ? `HTTP ${activeMethodEntry.http?.method ?? "GET"}`
+                                  : "JSON-RPC POST"}
                             </p>
                           </div>
-                        )}
-                      </div>
-                    )}
+
+                          {activeMethodEntry?.docsUrl ? (
+                            <a
+                              href={activeMethodEntry.docsUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex text-xs text-primary hover:underline"
+                            >
+                              Open docs
+                            </a>
+                          ) : null}
+
+                          {activeMethodEntry?.params?.kind === "table" ? (
+                            <div className="space-y-2">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-foreground/70">Inputs</p>
+                              <ul className="space-y-2">
+                                {activeMethodEntry.params.fields.map((field) => (
+                                  <li key={`${activeMethod}-${field.name}`} className="rounded-md border border-border bg-background/50 p-2">
+                                    <p className="text-xs font-medium text-foreground">{field.name}</p>
+                                    <p className="text-[11px] text-foreground/65">
+                                      {(field.type ?? "unknown").toLowerCase()} / {field.required ? "required" : "optional"}
+                                    </p>
+                                    {field.description ? <p className="mt-1 text-[11px] text-foreground/70">{field.description}</p> : null}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-foreground/70">Inputs</p>
+                              <p className="text-xs text-foreground/70">
+                                This method uses a raw JSON params array in the node editor.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </section>
-        ) : null}
+            </section>
+          </div>
+        </div>
 
         <section className="space-y-3">
           {orderedNodes.length === 0 ? (
@@ -1491,48 +2038,87 @@ export default function HomePage() {
               Add your first RPC node to begin building the workflow.
             </div>
           ) : (
-            orderedNodes.map((node, index) => {
-              const sourceNodes = node.outputOpen
-                ? orderedNodes
-                    .slice(0, index)
-                    .filter((candidate) => candidate.output !== undefined)
-                    .map((candidate) => ({
-                      id: candidate.id,
-                      name: candidate.name,
-                      output: candidate.output,
-                    }))
-                : [];
-
-              return (
-                <NodeCard
-                  key={node.id}
-                  node={node}
-                  selected={selectedNodeId === node.id}
-                  methodEntry={getMethodEntry(node.method)}
-                  sourceNodes={sourceNodes}
-                  onSelect={() => selectNode(node.id)}
-                  onRename={(name) => renameNode(node.id, name)}
-                  onRunNode={() => void runRange(index, index + 1)}
-                  onRunFromHere={() => void runRange(index, order.length)}
-                  onDelete={() => removeNode(node.id)}
-                  onToggleExpand={() => toggleOutputOpen(node.id)}
-                  onParamChange={(paramName, value) => setParamValue(node.id, paramName, value)}
-                  onRawParamsChange={(raw) => setRawParamsJson(node.id, raw)}
-                  onDragStart={() => setDraggingNodeId(node.id)}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={() => {
-                    if (draggingNodeId && draggingNodeId !== node.id) {
-                      reorderNodes(draggingNodeId, node.id);
-                    }
-                    setDraggingNodeId(undefined);
-                  }}
-                />
-              );
-            })
+            <NodeGraphCanvas
+              nodes={orderedNodes}
+              selectedNodeId={selectedNodeId}
+              connections={graphConnections}
+              callCountsByNodeId={nodeCallCounts}
+              callTargetsByNodeId={callTargetByNodeId}
+              executionOrderByNodeId={executionOrderByNodeId}
+              onSelectNode={selectNode}
+              onOpenNodeSettings={(nodeId) => {
+                setEditingNodeId(nodeId);
+                selectNode(nodeId);
+              }}
+              onDeleteNode={(nodeId) => {
+                removeNode(nodeId);
+                if (editingNodeId === nodeId) {
+                  setEditingNodeId(undefined);
+                }
+              }}
+              onMoveNode={(nodeId, position) => setNodePosition(nodeId, position)}
+            />
           )}
         </section>
       </div>
-      <NodeMapModal open={showNodeMap} nodes={orderedNodes} onClose={() => setShowNodeMap(false)} />
+      <NodeSettingsDialog
+        open={Boolean(editingNode)}
+        node={editingNode}
+        methodEntry={editingNode ? getMethodEntry(editingNode.method) : undefined}
+        sourceNodes={editingNodeSourceNodes}
+        callCount={editingNode ? (nodeCallCounts[editingNode.id] ?? 0) : 0}
+        callTarget={
+          editingNode
+            ? Object.prototype.hasOwnProperty.call(callTargetByNodeId, editingNode.id)
+              ? callTargetByNodeId[editingNode.id]
+              : 0
+            : 0
+        }
+        onClose={() => setEditingNodeId(undefined)}
+        onRename={(name) => {
+          if (!editingNode) {
+            return;
+          }
+          renameNode(editingNode.id, name);
+        }}
+        onDelete={() => {
+          if (!editingNode) {
+            return;
+          }
+          removeNode(editingNode.id);
+          setEditingNodeId(undefined);
+        }}
+        onRunNode={() => {
+          if (!editingNode || editingNodeIndex < 0) {
+            return;
+          }
+          void runRange(editingNodeIndex, editingNodeIndex + 1);
+        }}
+        onRunFromHere={() => {
+          if (!editingNode || editingNodeIndex < 0) {
+            return;
+          }
+          void runRange(editingNodeIndex, order.length);
+        }}
+        onParamChange={(paramName, value) => {
+          if (!editingNode) {
+            return;
+          }
+          setParamValue(editingNode.id, paramName, value);
+        }}
+        onRawParamsChange={(raw) => {
+          if (!editingNode) {
+            return;
+          }
+          setRawParamsJson(editingNode.id, raw);
+        }}
+        onRepeatChange={(value) => {
+          if (!editingNode) {
+            return;
+          }
+          setNodeRepeat(editingNode.id, value);
+        }}
+      />
     </div>
   );
 }

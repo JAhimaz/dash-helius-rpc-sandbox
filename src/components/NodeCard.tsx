@@ -1,17 +1,18 @@
 "use client";
 
-import { useMemo } from "react";
-import { ChevronDown, GripVertical, Play, PlayCircle, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ChevronDown, GripVertical, Play, PlayCircle, TimerReset, Trash2 } from "lucide-react";
 
 import { ParamEditor } from "@/components/ParamEditor";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { QuickTooltip } from "@/components/ui/quick-tooltip";
 import type { MethodRegistryEntry } from "@/lib/methodRegistry";
 import type { ParamValue } from "@/lib/workflowSchema";
-import type { WorkflowNode } from "@/store/workflowStore";
+import type { NodeRepeat, WorkflowNode } from "@/store/workflowStore";
 import { cn } from "@/lib/utils";
 
 interface NodeCardProps {
@@ -27,6 +28,9 @@ interface NodeCardProps {
   onToggleExpand: () => void;
   onParamChange: (paramName: string, value: ParamValue) => void;
   onRawParamsChange: (raw: string) => void;
+  onRepeatChange: (value: Partial<NodeRepeat>) => void;
+  callCount: number;
+  callTarget: number | null;
   onDragStart: () => void;
   onDragOver: (event: React.DragEvent<HTMLDivElement>) => void;
   onDrop: () => void;
@@ -70,10 +74,15 @@ export function NodeCard({
   onToggleExpand,
   onParamChange,
   onRawParamsChange,
+  onRepeatChange,
+  callCount,
+  callTarget,
   onDragStart,
   onDragOver,
   onDrop,
 }: NodeCardProps) {
+  const [repeatPopoverOpen, setRepeatPopoverOpen] = useState(false);
+
   const outputText = useMemo(() => {
     if (!node.outputOpen) {
       return "No output yet. Run node to see response.";
@@ -115,8 +124,96 @@ export function NodeCard({
               placeholder="Node Name"
               aria-label="Node Name"
             />
+            <div className="relative">
+              <QuickTooltip content="Configure repeat run">
+                <Button
+                  size="sm"
+                  variant={node.repeat.enabled ? "default" : "outline"}
+                  className="h-8 w-8 p-0"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setRepeatPopoverOpen((value) => !value);
+                  }}
+                  aria-label="Configure repeat run"
+                >
+                  <TimerReset className="h-3.5 w-3.5" />
+                </Button>
+              </QuickTooltip>
+              {repeatPopoverOpen ? (
+                <div
+                  className="absolute left-0 top-10 z-30 w-72 space-y-3 rounded-md border border-border bg-background/95 p-3 shadow-lg"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <label className="flex items-center gap-2 text-xs text-foreground/85">
+                    <Checkbox
+                      checked={node.repeat.enabled}
+                      onChange={(event) => onRepeatChange({ enabled: event.target.checked })}
+                      aria-label="Enable repeat run"
+                    />
+                    <span>Enable repeat</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 text-xs text-foreground/80">
+                    <span>Repeat</span>
+                    <Input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={node.repeat.count}
+                      onChange={(event) => onRepeatChange({ count: Number(event.target.value) })}
+                      disabled={!node.repeat.enabled}
+                      className="h-8 w-20 text-xs"
+                      aria-label="Repeat count"
+                    />
+                    <span>times</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 text-xs text-foreground/80">
+                    <span>every</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={node.repeat.interval}
+                      onChange={(event) => onRepeatChange({ interval: Number(event.target.value) })}
+                      disabled={!node.repeat.enabled}
+                      className="h-8 w-20 text-xs"
+                      aria-label="Repeat interval"
+                    />
+                    <select
+                      value={node.repeat.unit}
+                      onChange={(event) => onRepeatChange({ unit: event.target.value as NodeRepeat["unit"] })}
+                      disabled={!node.repeat.enabled}
+                      className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                      aria-label="Repeat interval unit"
+                    >
+                      <option value="milliseconds">milliseconds</option>
+                      <option value="seconds">seconds</option>
+                      <option value="minutes">minutes</option>
+                    </select>
+                  </label>
+
+                  <label className="flex items-center gap-2 text-xs text-foreground/80">
+                    <Input
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={node.repeat.loopCount}
+                      onChange={(event) => onRepeatChange({ loopCount: Number(event.target.value) })}
+                      disabled={!node.repeat.enabled}
+                      className="h-8 w-20 text-xs"
+                      aria-label="Repeat loop count"
+                    />
+                    <span>times (0 for infinite)</span>
+                  </label>
+                </div>
+              ) : null}
+            </div>
           </div>
           <div className="flex items-center gap-2">
+            <span className="rounded border border-border bg-background/50 px-2 py-0.5 font-mono text-[11px] text-foreground/75">
+              {callCount} / {callTarget === null ? "-" : callTarget}
+            </span>
             <Badge variant={statusVariant(node.status)}>{node.status}</Badge>
             <QuickTooltip content="Delete this node">
               <Button

@@ -1,9 +1,31 @@
 import { create } from "zustand";
 
 import { getMethodEntry } from "@/lib/methodRegistry";
-import type { ParamBinding, ParamValue, WorkflowExport } from "@/lib/workflowSchema";
+import type {
+  NodePosition as WorkflowNodePosition,
+  NodeRepeat as WorkflowNodeRepeat,
+  ParamBinding,
+  ParamValue,
+  WorkflowExport,
+} from "@/lib/workflowSchema";
 
 export type NodeStatus = "idle" | "running" | "success" | "error";
+export type NodeRepeat = WorkflowNodeRepeat;
+export type NodePosition = WorkflowNodePosition;
+export type RepeatUnit = NodeRepeat["unit"];
+
+export const DEFAULT_NODE_REPEAT: NodeRepeat = {
+  enabled: false,
+  count: 2,
+  interval: 1,
+  unit: "seconds",
+  loopCount: 1,
+};
+
+export const DEFAULT_NODE_POSITION: NodePosition = {
+  x: 80,
+  y: 80,
+};
 
 export interface WorkflowNode {
   id: string;
@@ -12,6 +34,8 @@ export interface WorkflowNode {
   schemaMode: "known" | "unknown";
   params: ParamBinding[];
   rawParamsJson: string;
+  repeat: NodeRepeat;
+  position: NodePosition;
   output?: unknown;
   error?: string;
   status: NodeStatus;
@@ -32,6 +56,8 @@ interface WorkflowStore {
   reorderNodes: (fromNodeId: string, toNodeId: string) => void;
   setParamValue: (nodeId: string, paramName: string, value: ParamValue) => void;
   setRawParamsJson: (nodeId: string, rawParamsJson: string) => void;
+  setNodeRepeat: (nodeId: string, repeat: Partial<NodeRepeat>) => void;
+  setNodePosition: (nodeId: string, position: NodePosition) => void;
   setNodeStatus: (nodeId: string, status: NodeStatus, error?: string) => void;
   setNodeOutput: (nodeId: string, output: unknown) => void;
   clearOutputs: () => void;
@@ -94,6 +120,9 @@ function buildDefaultParams(method: string): {
 function buildNode(method: string, position: number): WorkflowNode {
   const defaults = buildDefaultParams(method);
   const id = `n-${crypto.randomUUID()}`;
+  const zeroBasedPosition = Math.max(0, position - 1);
+  const column = zeroBasedPosition % 4;
+  const row = Math.floor(zeroBasedPosition / 4);
 
   return {
     id,
@@ -102,9 +131,119 @@ function buildNode(method: string, position: number): WorkflowNode {
     schemaMode: defaults.schemaMode,
     params: defaults.params,
     rawParamsJson: defaults.rawParamsJson,
+    repeat: DEFAULT_NODE_REPEAT,
+    position: {
+      x: DEFAULT_NODE_POSITION.x + column * 280,
+      y: DEFAULT_NODE_POSITION.y + row * 200,
+    },
     status: "idle",
     outputOpen: false,
   };
+}
+
+function normalizeRepeat(repeat?: Partial<NodeRepeat>): NodeRepeat {
+  const countCandidate = Number(repeat?.count ?? DEFAULT_NODE_REPEAT.count);
+  const intervalCandidate = Number(repeat?.interval ?? DEFAULT_NODE_REPEAT.interval);
+  const unitCandidate = repeat?.unit ?? DEFAULT_NODE_REPEAT.unit;
+
+  const count = Number.isFinite(countCandidate) ? Math.floor(countCandidate) : DEFAULT_NODE_REPEAT.count;
+  const interval = Number.isFinite(intervalCandidate)
+    ? Math.floor(intervalCandidate)
+    : DEFAULT_NODE_REPEAT.interval;
+  const loopCountCandidate = Number(repeat?.loopCount ?? DEFAULT_NODE_REPEAT.loopCount);
+  const loopCount = Number.isFinite(loopCountCandidate)
+    ? Math.floor(loopCountCandidate)
+    : DEFAULT_NODE_REPEAT.loopCount;
+
+  return {
+    enabled: repeat?.enabled ?? DEFAULT_NODE_REPEAT.enabled,
+    count: Math.min(Math.max(count, 1), 1000),
+    interval: Math.min(Math.max(interval, 0), 86_400_000),
+    unit:
+      unitCandidate === "milliseconds" || unitCandidate === "seconds" || unitCandidate === "minutes"
+        ? unitCandidate
+        : DEFAULT_NODE_REPEAT.unit,
+    loopCount: Math.min(Math.max(loopCount, 0), 100_000),
+  };
+}
+
+function normalizeNodePosition(position: Partial<NodePosition> | undefined, fallbackIndex: number): NodePosition {
+  const zeroBasedPosition = Math.max(0, fallbackIndex - 1);
+  const column = zeroBasedPosition % 4;
+  const row = Math.floor(zeroBasedPosition / 4);
+
+  const xCandidate = Number(position?.x);
+  const yCandidate = Number(position?.y);
+
+  return {
+    x: Number.isFinite(xCandidate) ? xCandidate : DEFAULT_NODE_POSITION.x + column * 280,
+    y: Number.isFinite(yCandidate) ? yCandidate : DEFAULT_NODE_POSITION.y + row * 200,
+  };
+}
+
+function buildReferenceAdjacency(nodes: Record<string, WorkflowNode>): Map<string, Set<string>> {
+  const adjacency = new Map<string, Set<string>>();
+
+  for (const node of Object.values(nodes)) {
+    for (const param of node.params) {
+      if (param.value.type !== "ref") {
+        continue;
+      }
+
+      const sourceNodeId = param.value.nodeId;
+      const targets = adjacency.get(sourceNodeId) ?? new Set<string>();
+      targets.add(node.id);
+      adjacency.set(sourceNodeId, targets);
+    }
+  }
+
+  return adjacency;
+}
+
+function hasPath(adjacency: Map<string, Set<string>>, fromNodeId: string, toNodeId: string): boolean {
+  if (fromNodeId === toNodeId) {
+    return true;
+  }
+
+  const visited = new Set<string>();
+  const stack: string[] = [fromNodeId];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current || visited.has(current)) {
+      continue;
+    }
+
+    visited.add(current);
+    const nextTargets = adjacency.get(current);
+    if (!nextTargets) {
+      continue;
+    }
+
+    for (const nextNodeId of nextTargets) {
+      if (nextNodeId === toNodeId) {
+        return true;
+      }
+      if (!visited.has(nextNodeId)) {
+        stack.push(nextNodeId);
+      }
+    }
+  }
+
+  return false;
+}
+
+function wouldCreateReferenceCycle(
+  nodes: Record<string, WorkflowNode>,
+  targetNodeId: string,
+  sourceNodeId: string,
+): boolean {
+  if (targetNodeId === sourceNodeId) {
+    return true;
+  }
+
+  const adjacency = buildReferenceAdjacency(nodes);
+  return hasPath(adjacency, targetNodeId, sourceNodeId);
 }
 
 export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
@@ -194,6 +333,10 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
         return state;
       }
 
+       if (value.type === "ref" && wouldCreateReferenceCycle(state.nodes, nodeId, value.nodeId)) {
+        return state;
+      }
+
       const existing = node.params.find((param) => param.name === paramName);
       const params = existing
         ? node.params.map((param) =>
@@ -230,6 +373,45 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
           [nodeId]: {
             ...node,
             rawParamsJson,
+          },
+        },
+      };
+    });
+  },
+  setNodeRepeat: (nodeId, repeat) => {
+    set((state) => {
+      const node = state.nodes[nodeId];
+      if (!node) {
+        return state;
+      }
+
+      return {
+        nodes: {
+          ...state.nodes,
+          [nodeId]: {
+            ...node,
+            repeat: normalizeRepeat({
+              ...node.repeat,
+              ...repeat,
+            }),
+          },
+        },
+      };
+    });
+  },
+  setNodePosition: (nodeId, position) => {
+    set((state) => {
+      const node = state.nodes[nodeId];
+      if (!node) {
+        return state;
+      }
+
+      return {
+        nodes: {
+          ...state.nodes,
+          [nodeId]: {
+            ...node,
+            position: normalizeNodePosition(position, state.order.indexOf(nodeId) + 1),
           },
         },
       };
@@ -326,6 +508,8 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
           schemaMode: node.schemaMode,
           params: node.params,
           rawParamsJson: node.rawParamsJson,
+          repeat: node.repeat,
+          position: node.position,
           ...(includeOutputs ? { output: node.output } : {}),
         })),
     };
@@ -333,10 +517,16 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
   importWorkflow: (workflow) => {
     set(() => {
       const nodes: Record<string, WorkflowNode> = {};
+      const orderIndexById = new Map<string, number>(
+        workflow.order.map((nodeId, index) => [nodeId, index + 1]),
+      );
 
       for (const node of workflow.nodes) {
+        const fallbackIndex = orderIndexById.get(node.id) ?? 1;
         nodes[node.id] = {
           ...node,
+          repeat: normalizeRepeat(node.repeat),
+          position: normalizeNodePosition(node.position, fallbackIndex),
           status: "idle",
           error: undefined,
           outputOpen: Boolean(node.output),

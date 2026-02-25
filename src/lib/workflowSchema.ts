@@ -17,6 +17,23 @@ export const paramBindingSchema = z.object({
   value: paramValueSchema,
 }).strict();
 
+export const nodeRepeatSchema = z
+  .object({
+    enabled: z.boolean(),
+    count: z.number().int().min(1).max(1000),
+    interval: z.number().int().min(0).max(86_400_000),
+    unit: z.enum(["milliseconds", "seconds", "minutes"]),
+    loopCount: z.number().int().min(0).max(100_000).default(1),
+  })
+  .strict();
+
+export const nodePositionSchema = z
+  .object({
+    x: z.number().finite(),
+    y: z.number().finite(),
+  })
+  .strict();
+
 export const workflowNodeExportSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -24,6 +41,8 @@ export const workflowNodeExportSchema = z.object({
   schemaMode: z.enum(["known", "unknown"]),
   params: z.array(paramBindingSchema),
   rawParamsJson: z.string(),
+  repeat: nodeRepeatSchema.optional(),
+  position: nodePositionSchema.optional(),
   output: z.unknown().optional(),
 }).strict();
 
@@ -41,6 +60,8 @@ export const workflowExportSchema = z.object({
 
 export type ParamValue = z.infer<typeof paramValueSchema>;
 export type ParamBinding = z.infer<typeof paramBindingSchema>;
+export type NodeRepeat = z.infer<typeof nodeRepeatSchema>;
+export type NodePosition = z.infer<typeof nodePositionSchema>;
 export type WorkflowNodeExport = z.infer<typeof workflowNodeExportSchema>;
 export type WorkflowExport = z.infer<typeof workflowExportSchema>;
 
