@@ -9,10 +9,12 @@ import {
   PanelRightClose,
   Play,
   Plus,
+  Download,
   RotateCcw,
   Send,
   Search,
   Square,
+  SquareChevronRight,
   StepForward,
   ToggleLeft,
   ToggleRight,
@@ -69,6 +71,30 @@ interface ChatResponsePayload {
   canAddNodes?: boolean;
   canAddNode?: boolean;
   availabilityError?: string;
+}
+
+interface ConsoleLogEntry {
+  timestamp: string;
+  nodeName: string;
+  output: unknown;
+}
+
+function formatTimestamp(): string {
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mm = String(now.getMinutes()).padStart(2, "0");
+  const ss = String(now.getSeconds()).padStart(2, "0");
+  const ms = String(now.getMilliseconds()).padStart(3, "0");
+  return `${hh}:${mm}:${ss}:${ms}`;
+}
+
+function stringifyConsoleOutput(output: unknown): string {
+  if (typeof output === "string") return output;
+  try {
+    return JSON.stringify(output, null, 2);
+  } catch {
+    return String(output);
+  }
 }
 
 interface RunRangeResult {
@@ -800,6 +826,9 @@ export default function HomePage() {
   const [statusMessage, setStatusMessage] = useState<string>("");
   const [showMethodPicker, setShowMethodPicker] = useState(false);
   const [showBotPanel, setShowBotPanel] = useState(false);
+  const [showConsole, setShowConsole] = useState(false);
+  const [consoleLogs, setConsoleLogs] = useState<ConsoleLogEntry[]>([]);
+  const consoleEndRef = useRef<HTMLDivElement | null>(null);
   const [isBotReplying, setIsBotReplying] = useState(false);
   const [isBotTesting, setIsBotTesting] = useState(false);
   const [botInput, setBotInput] = useState("");
@@ -816,6 +845,37 @@ export default function HomePage() {
   const [nodeCallTargets, setNodeCallTargets] = useState<Record<string, PlannedCallCount>>({});
   const activeExecutionAbortControllerRef = useRef<AbortController | null>(null);
   const activeWebSocketsRef = useRef<Map<string, WebSocket>>(new Map());
+
+  useEffect(() => {
+    consoleEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [consoleLogs]);
+
+  const logToConsole = (nodeId: string, output: unknown) => {
+    const node = useWorkflowStore.getState().nodes[nodeId];
+    setConsoleLogs((prev) => [
+      ...prev,
+      {
+        timestamp: formatTimestamp(),
+        nodeName: node?.name ?? node?.method ?? nodeId,
+        output,
+      },
+    ]);
+  };
+
+  const clearConsole = () => setConsoleLogs([]);
+
+  const exportConsoleLog = () => {
+    const lines = consoleLogs.map(
+      (entry) => `> ${entry.timestamp} | ${entry.nodeName}\n${stringifyConsoleOutput(entry.output)}\n`,
+    );
+    const blob = new Blob([lines.join("\n")], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `helius-flow-console-${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   useEffect(() => {
     if (gatekeeperEnabled && network === "testnet") {
@@ -1215,6 +1275,7 @@ export default function HomePage() {
 
             setIsBotTesting(true);
             clearOutputs();
+            clearConsole();
             const initialRun = await runRange(0, useWorkflowStore.getState().order.length);
 
             if (initialRun.success) {
@@ -1261,6 +1322,7 @@ export default function HomePage() {
 
                 applyNodeProposals(repairProposals);
                 clearOutputs();
+                clearConsole();
                 const repairRun = await runRange(0, useWorkflowStore.getState().order.length);
 
                 if (repairRun.success) {
@@ -1331,6 +1393,7 @@ export default function HomePage() {
       if (transport === "custom") {
         const output = getCustomNodeOutput(node, outputsByNodeId);
         setNodeOutput(node.id, output);
+        logToConsole(node.id, output);
         outputsByNodeId.set(node.id, output);
         setNodeStatus(node.id, "success");
         return { success: true };
@@ -1404,6 +1467,7 @@ export default function HomePage() {
 
             const output = data.params?.result ?? data;
             setNodeOutput(node.id, output);
+            logToConsole(node.id, output);
             outputsByNodeId.set(node.id, output);
 
             setNodeCallCounts((prev) => ({
@@ -1498,6 +1562,7 @@ export default function HomePage() {
       const text = await response.text();
       const parsed = parseRpcResponse(text);
       setNodeOutput(node.id, parsed);
+      logToConsole(node.id, parsed);
 
       if (!response.ok) {
         const message =
@@ -1895,6 +1960,7 @@ export default function HomePage() {
                 onClick={() => {
                   clearOutputs();
                   clearExecutionCallStats();
+                  clearConsole();
                 }}
                 disabled={isExecuting || order.length === 0}
                 aria-label="Reset"
@@ -1938,6 +2004,27 @@ export default function HomePage() {
                 (New) Gatekeeper ✨
               </Button>
             </QuickTooltip>
+            <QuickTooltip content={showConsole ? "Close console" : "Open console"}>
+              <Button
+                size="sm"
+                variant="outline"
+                className={showConsole ? "h-8 px-3 border-primary text-primary" : "h-8 px-3 text-foreground/60"}
+                onClick={() =>
+                  setShowConsole((value) => {
+                    const next = !value;
+                    if (next) {
+                      setShowBotPanel(false);
+                      setShowMethodPicker(false);
+                    }
+                    return next;
+                  })
+                }
+                aria-label={showConsole ? "Close console" : "Open console"}
+              >
+                <SquareChevronRight className="h-3.5 w-3.5" />
+                Console
+              </Button>
+            </QuickTooltip>
             <QuickTooltip content="Help me build">
               <Button
                 size="sm"
@@ -1948,6 +2035,7 @@ export default function HomePage() {
                     const next = !value;
                     if (next) {
                       setShowMethodPicker(false);
+                      setShowConsole(false);
                     }
                     return next;
                   })
@@ -1966,6 +2054,7 @@ export default function HomePage() {
                     const next = !value;
                     if (next) {
                       setShowBotPanel(false);
+                      setShowConsole(false);
                     }
                     return next;
                   })
@@ -2061,6 +2150,54 @@ export default function HomePage() {
                       </Button>
                     </QuickTooltip>
                   </form>
+                </div>
+              </section>
+            </div>
+          </div>
+
+          <div
+            className={`grid transition-[grid-template-rows,opacity,margin-top] duration-300 ease-in-out ${showConsole ? "mt-3 grid-rows-[1fr] opacity-100" : "pointer-events-none mt-0 grid-rows-[0fr] opacity-0"}`}
+            aria-hidden={!showConsole}
+          >
+            <div className="overflow-hidden">
+              <section
+                className={`panel-surface w-full rounded-xl border border-border p-4 transition-transform duration-300 ease-in-out ${showConsole ? "translate-y-0" : "-translate-y-2"}`}
+              >
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-foreground/70">Console</p>
+                  <QuickTooltip content="Export log as .txt">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 px-2 text-xs text-foreground/60"
+                      onClick={exportConsoleLog}
+                      disabled={consoleLogs.length === 0}
+                      aria-label="Export console log"
+                    >
+                      <Download className="mr-1 h-3 w-3" />
+                      Export
+                    </Button>
+                  </QuickTooltip>
+                </div>
+                <div className="h-[260px] overflow-y-auto rounded-lg bg-black/30 p-3 font-mono text-xs">
+                  {consoleLogs.length === 0 ? (
+                    <p className="text-foreground/40">No output yet.</p>
+                  ) : (
+                    consoleLogs.map((entry, index) => (
+                      <div key={`${entry.timestamp}-${index}`} className="mb-3">
+                        <p className="text-foreground/50">
+                          <span className="text-foreground/35">&gt;</span>{" "}
+                          <span className="text-foreground/60">{entry.timestamp}</span>
+                          {" | "}
+                          <span className="font-semibold text-primary">{entry.nodeName}</span>
+                        </p>
+                        <pre className="mt-1 whitespace-pre-wrap break-all rounded-md border border-border/50 bg-black/30 p-2.5 text-foreground/80">
+                          {stringifyConsoleOutput(entry.output)}
+                        </pre>
+                      </div>
+                    ))
+                  )}
+                  <div ref={consoleEndRef} />
                 </div>
               </section>
             </div>
