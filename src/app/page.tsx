@@ -165,6 +165,11 @@ const DEFAULT_HELIUS_HTTP_URLS: Record<RpcNetwork, string> = {
   devnet: "https://api-devnet.helius.xyz",
   testnet: "https://api-testnet.helius.xyz",
 };
+const DEFAULT_HELIUS_WS_URLS: Record<RpcNetwork, string> = {
+  mainnet: "wss://mainnet.helius-rpc.com",
+  devnet: "wss://devnet.helius-rpc.com",
+  testnet: "wss://testnet.helius-rpc.com",
+};
 const GATEKEEPER_RPC_URL = "https://beta.helius-rpc.com/";
 const SESSION_STORAGE_API_KEY = "helius-flow:api-key";
 
@@ -436,6 +441,15 @@ function buildHeliusHttpUrl(
   return url.toString();
 }
 
+function buildHeliusWebSocketUrl(apiKey: string, network: RpcNetwork): string {
+  const baseUrl = DEFAULT_HELIUS_WS_URLS[network];
+  const url = new URL(baseUrl);
+  if (apiKey.trim()) {
+    url.searchParams.set("api-key", apiKey.trim());
+  }
+  return url.toString();
+}
+
 function getMethodCategoryId(entry: MethodRegistryEntry): MethodCategoryId {
   return entry.category ?? "solana-rpc-apis";
 }
@@ -585,6 +599,49 @@ function buildDependencyExecutionOrder(
     orderedNodeIds: result.length === orderedNodeIds.length ? result : orderedNodeIds,
     hasCycle: result.length !== orderedNodeIds.length,
   };
+}
+
+function groupByExecutionLevel(
+  orderedNodeIds: string[],
+  nodes: Record<string, WorkflowNode>,
+): string[][] {
+  const nodeIdSet = new Set(orderedNodeIds);
+  const depths = new Map<string, number>();
+
+  function getDepth(nodeId: string, visited: Set<string>): number {
+    if (depths.has(nodeId)) return depths.get(nodeId)!;
+    if (visited.has(nodeId)) return 0;
+    visited.add(nodeId);
+
+    const node = nodes[nodeId];
+    if (!node) return 0;
+
+    let maxParentDepth = -1;
+    for (const param of node.params) {
+      if (param.value.type === "ref" && nodeIdSet.has(param.value.nodeId)) {
+        maxParentDepth = Math.max(maxParentDepth, getDepth(param.value.nodeId, visited));
+      }
+    }
+
+    const depth = maxParentDepth + 1;
+    depths.set(nodeId, depth);
+    return depth;
+  }
+
+  for (const nodeId of orderedNodeIds) {
+    getDepth(nodeId, new Set());
+  }
+
+  const levels: string[][] = [];
+  for (const nodeId of orderedNodeIds) {
+    const depth = depths.get(nodeId) ?? 0;
+    while (levels.length <= depth) {
+      levels.push([]);
+    }
+    levels[depth].push(nodeId);
+  }
+
+  return levels;
 }
 
 function getReferencedDownstreamNodeIds(
@@ -758,6 +815,7 @@ export default function HomePage() {
   const [nodeCallCounts, setNodeCallCounts] = useState<Record<string, number>>({});
   const [nodeCallTargets, setNodeCallTargets] = useState<Record<string, PlannedCallCount>>({});
   const activeExecutionAbortControllerRef = useRef<AbortController | null>(null);
+  const activeWebSocketsRef = useRef<Map<string, WebSocket>>(new Map());
 
   useEffect(() => {
     if (gatekeeperEnabled && network === "testnet") {
@@ -807,20 +865,42 @@ export default function HomePage() {
     [order, nodes],
   );
   const executionOrderByNodeId = useMemo<Record<string, number | null>>(() => {
-    const orderByNodeId: Record<string, number | null> = {};
-
-    for (const node of orderedNodes) {
-      orderByNodeId[node.id] = dependencyExecutionPlan.hasCycle ? null : 0;
+    if (dependencyExecutionPlan.hasCycle) {
+      const orderByNodeId: Record<string, number | null> = {};
+      for (const node of orderedNodes) {
+        orderByNodeId[node.id] = null;
+      }
+      return orderByNodeId;
     }
 
-    if (!dependencyExecutionPlan.hasCycle) {
-      dependencyExecutionPlan.orderedNodeIds.forEach((nodeId, index) => {
-        orderByNodeId[nodeId] = index + 1;
-      });
+    const nodeIdSet = new Set(dependencyExecutionPlan.orderedNodeIds);
+    const depths: Record<string, number> = {};
+
+    function getDepth(nodeId: string, visited: Set<string>): number {
+      if (depths[nodeId] !== undefined) return depths[nodeId];
+      if (visited.has(nodeId)) return 1;
+      visited.add(nodeId);
+
+      const node = nodes[nodeId];
+      if (!node) { depths[nodeId] = 1; return 1; }
+
+      let maxParentDepth = 0;
+      for (const param of node.params) {
+        if (param.value.type === "ref" && nodeIdSet.has(param.value.nodeId)) {
+          maxParentDepth = Math.max(maxParentDepth, getDepth(param.value.nodeId, visited));
+        }
+      }
+
+      depths[nodeId] = maxParentDepth + 1;
+      return depths[nodeId];
     }
 
-    return orderByNodeId;
-  }, [dependencyExecutionPlan, orderedNodes]);
+    for (const nodeId of dependencyExecutionPlan.orderedNodeIds) {
+      getDepth(nodeId, new Set());
+    }
+
+    return depths;
+  }, [dependencyExecutionPlan, orderedNodes, nodes]);
   const defaultPlannedCallCounts = useMemo(
     () =>
       calculatePlannedCallCounts(
@@ -924,6 +1004,13 @@ export default function HomePage() {
         label: "ZK Compression",
         methods: methodEntries
           .filter((entry) => getMethodCategoryId(entry) === "zk-compression")
+          .map((entry) => entry.method),
+      },
+      {
+        id: "websockets",
+        label: "WebSockets",
+        methods: methodEntries
+          .filter((entry) => getMethodCategoryId(entry) === "websockets")
           .map((entry) => entry.method),
       },
       {
@@ -1249,6 +1336,123 @@ export default function HomePage() {
         return { success: true };
       }
 
+      if (transport === "websocket") {
+        const subscriptionMethodParam = node.params.find((p) => p.name === "subscriptionMethod");
+        const paramsParam = node.params.find((p) => p.name === "params");
+
+        const subscriptionMethod = subscriptionMethodParam
+          ? String(resolveParamValue(subscriptionMethodParam.value, outputsByNodeId) ?? "")
+          : "";
+
+        if (!subscriptionMethod) {
+          throw new Error("subscriptionMethod is required for WebSocket nodes.");
+        }
+
+        let subscriptionParams: unknown[] = [];
+        if (paramsParam) {
+          const raw = resolveParamValue(paramsParam.value, outputsByNodeId);
+          if (typeof raw === "string") {
+            try {
+              subscriptionParams = JSON.parse(raw) as unknown[];
+            } catch {
+              subscriptionParams = [];
+            }
+          } else if (Array.isArray(raw)) {
+            subscriptionParams = raw;
+          }
+        }
+
+        const wsUrl = buildHeliusWebSocketUrl(apiKeyValue, network);
+        const ws = new WebSocket(wsUrl);
+        activeWebSocketsRef.current.set(node.id, ws);
+
+        const cleanup = () => {
+          activeWebSocketsRef.current.delete(node.id);
+          if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+            ws.close();
+          }
+        };
+
+        const onAbort = () => {
+          cleanup();
+          setNodeStatus(node.id, "idle");
+        };
+
+        signal.addEventListener("abort", onAbort, { once: true });
+
+        ws.onopen = () => {
+          ws.send(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: 1,
+              method: subscriptionMethod,
+              params: subscriptionParams,
+            }),
+          );
+        };
+
+        ws.onmessage = async (event) => {
+          if (signal.aborted) return;
+
+          try {
+            const data = JSON.parse(String(event.data));
+
+            // Skip subscription confirmation responses
+            if (data.result !== undefined && !data.method) {
+              return;
+            }
+
+            const output = data.params?.result ?? data;
+            setNodeOutput(node.id, output);
+            outputsByNodeId.set(node.id, output);
+
+            setNodeCallCounts((prev) => ({
+              ...prev,
+              [node.id]: (prev[node.id] ?? 0) + 1,
+            }));
+
+            // Trigger all downstream nodes on each message
+            const state = useWorkflowStore.getState();
+            const allNodeIds = [...state.order];
+            const includedNodeIds = new Set(allNodeIds);
+            const downstreamNodeIds = getReferencedDownstreamNodeIds(
+              allNodeIds,
+              state.nodes,
+              node.id,
+              includedNodeIds,
+            );
+
+            for (const downstreamNodeId of downstreamNodeIds) {
+              if (signal.aborted) break;
+              await executeSingleNode(downstreamNodeId, outputsByNodeId, signal);
+            }
+          } catch {
+            // ignore unparseable messages
+          }
+        };
+
+        ws.onerror = () => {
+          if (signal.aborted) return;
+          signal.removeEventListener("abort", onAbort);
+          cleanup();
+          setNodeStatus(node.id, "error", "WebSocket connection error.");
+        };
+
+        ws.onclose = (event) => {
+          if (signal.aborted) return;
+          signal.removeEventListener("abort", onAbort);
+          cleanup();
+          if (event.wasClean) {
+            setNodeStatus(node.id, "success");
+          } else {
+            setNodeStatus(node.id, "error", `WebSocket closed unexpectedly (code ${event.code}).`);
+          }
+        };
+
+        // Return immediately — WebSocket runs in background, doesn't block execution
+        return { success: true };
+      }
+
       if (transport === "http") {
         if (!methodEntry?.http) {
           throw new Error(`Method ${node.method} is marked as HTTP but has no HTTP config.`);
@@ -1395,7 +1599,9 @@ export default function HomePage() {
     setIsExecuting(true);
 
     try {
-      for (const nodeId of executionOrder) {
+      const levels = groupByExecutionLevel(executionOrder, state.nodes);
+
+      for (const level of levels) {
         if (executionController.signal.aborted) {
           return {
             success: false,
@@ -1404,79 +1610,67 @@ export default function HomePage() {
           };
         }
 
-        if (skippedNodeIds.has(nodeId)) {
-          continue;
-        }
+        const levelNodes = level.filter((nodeId) => !skippedNodeIds.has(nodeId));
+        if (levelNodes.length === 0) continue;
 
-        const node = useWorkflowStore.getState().nodes[nodeId];
-        if (!node) {
-          continue;
-        }
+        const executeNode = async (nodeId: string): Promise<RunRangeResult> => {
+          const node = useWorkflowStore.getState().nodes[nodeId];
+          if (!node) return { success: true };
 
-        if (!node.repeat.enabled) {
-          const singleResult = await executeSingleNode(nodeId, outputsByNodeId, executionController.signal);
-          if (!singleResult.success) {
-            if (singleResult.canceled) {
+          if (!node.repeat.enabled) {
+            return executeSingleNode(nodeId, outputsByNodeId, executionController.signal);
+          }
+
+          const downstreamNodeIds = getReferencedDownstreamNodeIds(
+            executionOrder,
+            useWorkflowStore.getState().nodes,
+            nodeId,
+            includedNodeIds,
+          );
+          const repeatCount = Math.max(1, Math.floor(node.repeat.count));
+          const loopCount = Math.max(0, Math.floor(node.repeat.loopCount));
+          const repeatDelayMs = repeatIntervalToMs(Math.max(0, Math.floor(node.repeat.interval)), node.repeat.unit);
+          let globalIteration = 0;
+
+          for (let cycle = 0; loopCount === 0 || cycle < loopCount; cycle += 1) {
+            for (let iteration = 0; iteration < repeatCount; iteration += 1) {
+              if (globalIteration > 0 && repeatDelayMs > 0) {
+                await sleepWithSignal(repeatDelayMs, executionController.signal);
+              }
+
+              const nodeResult = await executeSingleNode(nodeId, outputsByNodeId, executionController.signal);
+              if (!nodeResult.success) return nodeResult;
+
+              for (const downstreamNodeId of downstreamNodeIds) {
+                const downstreamResult = await executeSingleNode(downstreamNodeId, outputsByNodeId, executionController.signal);
+                if (!downstreamResult.success) return downstreamResult;
+              }
+
+              globalIteration += 1;
+            }
+          }
+
+          for (const downstreamNodeId of downstreamNodeIds) {
+            skippedNodeIds.add(downstreamNodeId);
+          }
+
+          return { success: true };
+        };
+
+        // Run all nodes at this level in parallel
+        const results = await Promise.all(levelNodes.map(executeNode));
+
+        for (const result of results) {
+          if (!result.success) {
+            if (result.canceled) {
               setStatusMessage("Execution stopped.");
             } else {
               setStatusMessage(
-                `Execution stopped at ${singleResult.failedNodeName ?? "node"}: ${singleResult.errorMessage ?? "unknown error"}`,
+                `Execution stopped at ${result.failedNodeName ?? "node"}: ${result.errorMessage ?? "unknown error"}`,
               );
             }
-            return singleResult;
+            return result;
           }
-          continue;
-        }
-
-        const downstreamNodeIds = getReferencedDownstreamNodeIds(
-          executionOrder,
-          useWorkflowStore.getState().nodes,
-          nodeId,
-          includedNodeIds,
-        );
-        const repeatCount = Math.max(1, Math.floor(node.repeat.count));
-        const loopCount = Math.max(0, Math.floor(node.repeat.loopCount));
-        const repeatDelayMs = repeatIntervalToMs(Math.max(0, Math.floor(node.repeat.interval)), node.repeat.unit);
-        let globalIteration = 0;
-
-        for (let cycle = 0; loopCount === 0 || cycle < loopCount; cycle += 1) {
-          for (let iteration = 0; iteration < repeatCount; iteration += 1) {
-            if (globalIteration > 0 && repeatDelayMs > 0) {
-              await sleepWithSignal(repeatDelayMs, executionController.signal);
-            }
-
-            const nodeResult = await executeSingleNode(nodeId, outputsByNodeId, executionController.signal);
-            if (!nodeResult.success) {
-              if (nodeResult.canceled) {
-                setStatusMessage("Execution stopped.");
-              } else {
-                setStatusMessage(
-                  `Execution stopped at ${nodeResult.failedNodeName ?? "node"}: ${nodeResult.errorMessage ?? "unknown error"}`,
-                );
-              }
-              return nodeResult;
-            }
-
-            for (const downstreamNodeId of downstreamNodeIds) {
-              const downstreamResult = await executeSingleNode(downstreamNodeId, outputsByNodeId, executionController.signal);
-              if (!downstreamResult.success) {
-                if (downstreamResult.canceled) {
-                  setStatusMessage("Execution stopped.");
-                } else {
-                  setStatusMessage(
-                    `Execution stopped at ${downstreamResult.failedNodeName ?? "node"}: ${downstreamResult.errorMessage ?? "unknown error"}`,
-                  );
-                }
-                return downstreamResult;
-              }
-            }
-
-            globalIteration += 1;
-          }
-        }
-
-        for (const downstreamNodeId of downstreamNodeIds) {
-          skippedNodeIds.add(downstreamNodeId);
         }
       }
     } catch (error) {
@@ -1509,6 +1703,12 @@ export default function HomePage() {
     }
 
     controller.abort();
+    for (const ws of activeWebSocketsRef.current.values()) {
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+        ws.close();
+      }
+    }
+    activeWebSocketsRef.current.clear();
     setStatusMessage("Execution stopped.");
   };
 
@@ -1982,9 +2182,11 @@ export default function HomePage() {
                               Request:{" "}
                               {activeMethodEntry?.transport === "custom"
                                 ? "Local custom node"
-                                : activeMethodEntry?.transport === "http"
-                                  ? `HTTP ${activeMethodEntry.http?.method ?? "GET"}`
-                                  : "JSON-RPC POST"}
+                                : activeMethodEntry?.transport === "websocket"
+                                  ? "WebSocket subscription"
+                                  : activeMethodEntry?.transport === "http"
+                                    ? `HTTP ${activeMethodEntry.http?.method ?? "GET"}`
+                                    : "JSON-RPC POST"}
                             </p>
                           </div>
 

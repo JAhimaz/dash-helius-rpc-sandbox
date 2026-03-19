@@ -4715,6 +4715,45 @@
       ]
     },
     {
+      "method": "WebSocket",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/websockets",
+      "category": "websockets",
+      "transport": "websocket",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "subscriptionMethod",
+            "type": "string",
+            "required": true,
+            "description": "The Solana WebSocket subscription method. e.g. accountSubscribe, logsSubscribe, programSubscribe, slotSubscribe, rootSubscribe, signatureSubscribe, blockSubscribe"
+          },
+          {
+            "name": "params",
+            "type": "json",
+            "required": false,
+            "description": "Subscription parameters as a JSON array. e.g. for accountSubscribe: [\"<pubkey>\", {\"encoding\": \"jsonParsed\"}]"
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "jsonrpc": "2.0",
+          "method": "accountNotification",
+          "params": {
+            "subscription": 123,
+            "result": {
+              "context": { "slot": 123456 },
+              "value": "..."
+            }
+          }
+        }
+      },
+      "errors": []
+    },
+    {
       "method": "Log Output",
       "docsUrl": "#custom/log-output",
       "category": "custom",

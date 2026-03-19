@@ -6,8 +6,9 @@ export type MethodCategoryId =
   | "digital-asset-standard-das"
   | "wallet-api"
   | "zk-compression"
+  | "websockets"
   | "custom";
-export type MethodTransport = "jsonrpc" | "http" | "custom";
+export type MethodTransport = "jsonrpc" | "http" | "custom" | "websocket";
 export type HttpMethod = "GET" | "POST";
 export type JsonRpcParamsStyle = "array" | "object";
 

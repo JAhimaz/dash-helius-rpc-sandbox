@@ -74,8 +74,9 @@ const METHOD_DEFAULT_LITERAL_PARAMS: Record<string, Record<string, unknown>> = {
   },
 };
 
-function defaultNodeName(method: string, position: number): string {
-  return `${method} #${position}`;
+function defaultNodeName(method: string, existingNodes: Record<string, WorkflowNode>): string {
+  const dupeCount = Object.values(existingNodes).filter((n) => n.method === method).length;
+  return dupeCount === 0 ? method : `${method} (${dupeCount})`;
 }
 
 function buildDefaultParams(method: string): {
@@ -117,7 +118,7 @@ function buildDefaultParams(method: string): {
   };
 }
 
-function buildNode(method: string, position: number): WorkflowNode {
+function buildNode(method: string, position: number, existingNodes: Record<string, WorkflowNode>): WorkflowNode {
   const defaults = buildDefaultParams(method);
   const id = `n-${crypto.randomUUID()}`;
   const zeroBasedPosition = Math.max(0, position - 1);
@@ -126,7 +127,7 @@ function buildNode(method: string, position: number): WorkflowNode {
 
   return {
     id,
-    name: defaultNodeName(method, position),
+    name: defaultNodeName(method, existingNodes),
     method,
     schemaMode: defaults.schemaMode,
     params: defaults.params,
@@ -253,7 +254,8 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
   includeOutputsOnExport: false,
   setApiKey: (apiKey) => set({ apiKey }),
   addNode: (method) => {
-    const next = buildNode(method, get().order.length + 1);
+    const state = get();
+    const next = buildNode(method, state.order.length + 1, state.nodes);
     set((state) => ({
       order: [...state.order, next.id],
       nodes: { ...state.nodes, [next.id]: next },
