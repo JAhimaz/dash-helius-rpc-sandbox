@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { Play, PlayCircle, Trash2, X } from "lucide-react";
 
 import { ParamEditor } from "@/components/ParamEditor";
@@ -27,6 +28,7 @@ interface NodeSettingsDialogProps {
   onParamChange: (paramName: string, value: ParamValue) => void;
   onRawParamsChange: (raw: string) => void;
   onRepeatChange: (value: Partial<NodeRepeat>) => void;
+  listNodeName?: string;
 }
 
 function statusVariant(status: WorkflowNode["status"]): "secondary" | "warning" | "success" | "destructive" {
@@ -69,18 +71,60 @@ export function NodeSettingsDialog({
   onParamChange,
   onRawParamsChange,
   onRepeatChange,
+  listNodeName,
 }: NodeSettingsDialogProps) {
   const outputText =
     node?.output === undefined
       ? "No output yet. Run node to see response."
       : stringifyOutput(node.output);
 
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    const overlay = overlayRef.current;
+    if (!overlay) return;
+
+    const blockWheel = (e: WheelEvent) => {
+      const target = e.target as HTMLElement;
+      const scrollable = target.closest("[data-dialog-scroll]");
+      if (!scrollable) {
+        e.preventDefault();
+        return;
+      }
+      const el = scrollable as HTMLElement;
+      const atTop = el.scrollTop === 0 && e.deltaY < 0;
+      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight && e.deltaY > 0;
+      if (atTop || atBottom) {
+        e.preventDefault();
+      }
+    };
+
+    overlay.addEventListener("wheel", blockWheel, { passive: false });
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.documentElement.style.overflow = "";
+      overlay.removeEventListener("wheel", blockWheel);
+    };
+  }, [open]);
+
   if (!open || !node) {
     return null;
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-6 backdrop-blur-sm" onMouseDown={onClose} role="presentation">
+    <div
+      ref={overlayRef}
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-6 backdrop-blur-sm"
+      onMouseDown={onClose}
+      role="presentation"
+    >
       <section
         className="max-h-[80vh] w-full max-w-4xl overflow-hidden rounded-xl border border-border bg-background shadow-2xl shadow-black/30"
         onMouseDown={(event) => event.stopPropagation()}
@@ -119,8 +163,19 @@ export function NodeSettingsDialog({
           </div>
         </header>
 
-        <div className="max-h-[calc(80vh-57px)] overflow-auto p-4">
-          {methodEntry?.transport !== "websocket" && (
+        <div data-dialog-scroll className="max-h-[calc(80vh-57px)] overflow-auto overscroll-contain p-4">
+          {listNodeName ? (
+          <div className="mb-4 rounded-md border border-primary/30 bg-primary/10 p-3">
+            <div className="flex items-center gap-2 text-xs text-foreground/85">
+              <span className="font-semibold text-primary">List-driven</span>
+              <span className="text-foreground/60">— iterating over</span>
+              <span className="rounded border border-primary/40 bg-primary/20 px-1.5 py-0.5 font-medium text-primary">{listNodeName}</span>
+              <span className="ml-auto font-mono text-foreground/70">
+                [{callCount} / {callTarget === null ? "-" : callTarget}]
+              </span>
+            </div>
+          </div>
+          ) : methodEntry?.transport !== "websocket" ? (
           <div className="mb-4 rounded-md border border-border bg-background/55 p-3">
             <div className="mb-2 flex items-center gap-2 text-xs text-foreground/85">
               <Checkbox
@@ -187,12 +242,12 @@ export function NodeSettingsDialog({
               </label>
             </div>
           </div>
-          )}
+          ) : null}
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="flex h-[380px] flex-col rounded-md border border-border bg-background/60 p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-foreground/65">Input</p>
-              <div className="mt-3 min-h-0 flex-1 overflow-auto pr-1">
+              <div data-dialog-scroll className="mt-3 min-h-0 flex-1 overflow-auto overscroll-contain pr-1">
                 {methodEntry?.schema === "unknown" ? (
                   <p className="mb-3 rounded-md border border-warning/35 bg-warning/15 px-3 py-2 text-xs text-warning">
                     Schema unknown for this method. Params use raw JSON array and output is shown as raw JSON.
@@ -210,7 +265,7 @@ export function NodeSettingsDialog({
 
             <div className="flex h-[380px] flex-col rounded-md border border-border bg-background/60 p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-foreground/65">Output</p>
-              <div className="mt-3 min-h-0 flex-1 overflow-auto pr-1">
+              <div data-dialog-scroll className="mt-3 min-h-0 flex-1 overflow-auto overscroll-contain pr-1">
                 {node.error ? (
                   <div className="mb-3 rounded-md border border-error/35 bg-error/15 px-3 py-2 text-xs text-error">
                     {node.error}

@@ -489,6 +489,21 @@ function getCustomNodeOutput(node: WorkflowNode, outputsByNodeId: Map<string, un
   return resolveParamValue(valueParam.value, outputsByNodeId);
 }
 
+function getListReference(
+  node: WorkflowNode,
+  nodes: Record<string, WorkflowNode>,
+): { paramName: string; listNodeId: string; path: string } | null {
+  for (const param of node.params) {
+    if (param.value.type === "ref") {
+      const refNode = nodes[param.value.nodeId];
+      if (refNode?.method === "List") {
+        return { paramName: param.name, listNodeId: param.value.nodeId, path: param.value.path };
+      }
+    }
+  }
+  return null;
+}
+
 function referencesAnyNode(node: WorkflowNode, nodeIds: Set<string>): boolean {
   return node.params.some((param) => param.value.type === "ref" && nodeIds.has(param.value.nodeId));
 }
@@ -845,6 +860,7 @@ export default function HomePage() {
   const [nodeCallTargets, setNodeCallTargets] = useState<Record<string, PlannedCallCount>>({});
   const activeExecutionAbortControllerRef = useRef<AbortController | null>(null);
   const activeWebSocketsRef = useRef<Map<string, WebSocket>>(new Map());
+  const aggregatorStateRef = useRef<Map<string, { accumulated: number; iterations: number }>>(new Map());
 
   useEffect(() => {
     consoleEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1276,6 +1292,7 @@ export default function HomePage() {
             setIsBotTesting(true);
             clearOutputs();
             clearConsole();
+            aggregatorStateRef.current.clear();
             const initialRun = await runRange(0, useWorkflowStore.getState().order.length);
 
             if (initialRun.success) {
@@ -1391,7 +1408,88 @@ export default function HomePage() {
       let response: Response;
 
       if (transport === "custom") {
-        const output = getCustomNodeOutput(node, outputsByNodeId);
+        let output: unknown;
+
+        if (node.method === "Value Aggregator") {
+          const valueParam = node.params.find((p) => p.name === "value");
+          const operationParam = node.params.find((p) => p.name === "operation");
+          const initialValueParam = node.params.find((p) => p.name === "initialValue");
+
+          const incomingValue = Number(valueParam ? resolveParamValue(valueParam.value, outputsByNodeId) : 0) || 0;
+          const operation = String(operationParam ? resolveParamValue(operationParam.value, outputsByNodeId) : "add");
+          const initialValue = Number(initialValueParam ? resolveParamValue(initialValueParam.value, outputsByNodeId) : 0) || 0;
+
+          const state = aggregatorStateRef.current.get(node.id) ?? { accumulated: initialValue, iterations: 0 };
+
+          const AGG_MAX = 1e15;
+          const AGG_MIN = -1e15;
+
+          switch (operation) {
+            case "add":
+              state.accumulated += incomingValue;
+              break;
+            case "subtract":
+              state.accumulated -= incomingValue;
+              break;
+            case "multiply":
+              state.accumulated *= incomingValue;
+              break;
+            case "divide":
+              state.accumulated = incomingValue !== 0 ? state.accumulated / incomingValue : state.accumulated;
+              break;
+            default:
+              state.accumulated += incomingValue;
+          }
+
+          state.accumulated = Math.min(AGG_MAX, Math.max(AGG_MIN, state.accumulated));
+          state.accumulated = Number(state.accumulated.toFixed(12));
+          state.iterations += 1;
+          aggregatorStateRef.current.set(node.id, state);
+
+          output = {
+            accumulated: state.accumulated,
+            lastValue: incomingValue,
+            operation,
+            iterations: state.iterations,
+          };
+        } else if (node.method === "Arithmetic") {
+          const inputParam = node.params.find((p) => p.name === "input");
+          const operationParam = node.params.find((p) => p.name === "operation");
+          const operandParam = node.params.find((p) => p.name === "operand");
+
+          const inputValue = Number(inputParam ? resolveParamValue(inputParam.value, outputsByNodeId) : 0) || 0;
+          const operation = String(operationParam ? resolveParamValue(operationParam.value, outputsByNodeId) : "add");
+          const operand = Number(operandParam ? resolveParamValue(operandParam.value, outputsByNodeId) : 0) || 0;
+
+          const ARITH_MAX = 1e15;
+          const ARITH_MIN = -1e15;
+
+          let result: number;
+          switch (operation) {
+            case "add":
+              result = inputValue + operand;
+              break;
+            case "subtract":
+              result = inputValue - operand;
+              break;
+            case "multiply":
+              result = inputValue * operand;
+              break;
+            case "divide":
+              result = operand !== 0 ? inputValue / operand : inputValue;
+              break;
+            default:
+              result = inputValue;
+          }
+
+          result = Math.min(ARITH_MAX, Math.max(ARITH_MIN, result));
+          result = Number(result.toFixed(12));
+
+          output = { input: inputValue, operation, operand, result };
+        } else {
+          output = getCustomNodeOutput(node, outputsByNodeId);
+        }
+
         setNodeOutput(node.id, output);
         logToConsole(node.id, output);
         outputsByNodeId.set(node.id, output);
@@ -1713,6 +1811,67 @@ export default function HomePage() {
           const node = useWorkflowStore.getState().nodes[nodeId];
           if (!node) return { success: true };
 
+          // Check if this node references a List node
+          const listRef = getListReference(node, useWorkflowStore.getState().nodes);
+          if (listRef) {
+            const listOutput = outputsByNodeId.get(listRef.listNodeId);
+            const listArray = Array.isArray(listOutput) ? listOutput : [];
+            if (listArray.length === 0) {
+              setNodeStatus(nodeId, "error", "List is empty.");
+              return { success: false, failedNodeId: nodeId, failedNodeName: node.name, errorMessage: "List is empty." };
+            }
+
+            setNodeCallTargets((prev) => ({ ...prev, [nodeId]: listArray.length }));
+
+            const downstreamNodeIds = getReferencedDownstreamNodeIds(
+              executionOrder,
+              useWorkflowStore.getState().nodes,
+              nodeId,
+              includedNodeIds,
+            );
+
+            const currentNodes = useWorkflowStore.getState().nodes;
+            const iterationDownstream = downstreamNodeIds.filter((id) => currentNodes[id]?.method !== "Arithmetic");
+            const postIterationDownstream = downstreamNodeIds.filter((id) => currentNodes[id]?.method === "Arithmetic");
+
+            const originalListOutput = outputsByNodeId.get(listRef.listNodeId);
+
+            for (let i = 0; i < listArray.length; i += 1) {
+              if (executionController.signal.aborted) {
+                return { success: false, canceled: true, errorMessage: "Execution stopped by user." };
+              }
+
+              outputsByNodeId.set(listRef.listNodeId, listArray[i]);
+
+              const result = await executeSingleNode(nodeId, outputsByNodeId, executionController.signal);
+              if (!result.success) return result;
+
+              for (const downstreamNodeId of iterationDownstream) {
+                const dsResult = await executeSingleNode(downstreamNodeId, outputsByNodeId, executionController.signal);
+                if (!dsResult.success) return dsResult;
+              }
+            }
+
+            if (originalListOutput !== undefined) {
+              outputsByNodeId.set(listRef.listNodeId, originalListOutput);
+            }
+
+            // Run Arithmetic nodes once after all iterations
+            for (const downstreamNodeId of postIterationDownstream) {
+              if (executionController.signal.aborted) {
+                return { success: false, canceled: true, errorMessage: "Execution stopped by user." };
+              }
+              const dsResult = await executeSingleNode(downstreamNodeId, outputsByNodeId, executionController.signal);
+              if (!dsResult.success) return dsResult;
+            }
+
+            for (const downstreamNodeId of downstreamNodeIds) {
+              skippedNodeIds.add(downstreamNodeId);
+            }
+
+            return { success: true };
+          }
+
           if (!node.repeat.enabled) {
             return executeSingleNode(nodeId, outputsByNodeId, executionController.signal);
           }
@@ -1723,6 +1882,11 @@ export default function HomePage() {
             nodeId,
             includedNodeIds,
           );
+
+          const repeatNodes = useWorkflowStore.getState().nodes;
+          const repeatIterationDownstream = downstreamNodeIds.filter((id) => repeatNodes[id]?.method !== "Arithmetic");
+          const repeatPostIterationDownstream = downstreamNodeIds.filter((id) => repeatNodes[id]?.method === "Arithmetic");
+
           const repeatCount = Math.max(1, Math.floor(node.repeat.count));
           const loopCount = Math.max(0, Math.floor(node.repeat.loopCount));
           const repeatDelayMs = repeatIntervalToMs(Math.max(0, Math.floor(node.repeat.interval)), node.repeat.unit);
@@ -1737,13 +1901,22 @@ export default function HomePage() {
               const nodeResult = await executeSingleNode(nodeId, outputsByNodeId, executionController.signal);
               if (!nodeResult.success) return nodeResult;
 
-              for (const downstreamNodeId of downstreamNodeIds) {
+              for (const downstreamNodeId of repeatIterationDownstream) {
                 const downstreamResult = await executeSingleNode(downstreamNodeId, outputsByNodeId, executionController.signal);
                 if (!downstreamResult.success) return downstreamResult;
               }
 
               globalIteration += 1;
             }
+          }
+
+          // Run Arithmetic nodes once after all repeat iterations
+          for (const downstreamNodeId of repeatPostIterationDownstream) {
+            if (executionController.signal.aborted) {
+              return { success: false, canceled: true, errorMessage: "Execution stopped by user." };
+            }
+            const dsResult = await executeSingleNode(downstreamNodeId, outputsByNodeId, executionController.signal);
+            if (!dsResult.success) return dsResult;
           }
 
           for (const downstreamNodeId of downstreamNodeIds) {
@@ -1996,6 +2169,7 @@ export default function HomePage() {
                   clearOutputs();
                   clearExecutionCallStats();
                   clearConsole();
+                  aggregatorStateRef.current.clear();
                 }}
                 disabled={isExecuting || order.length === 0}
                 aria-label="Reset"
@@ -2219,16 +2393,16 @@ export default function HomePage() {
                     <p className="text-foreground/40">No output yet.</p>
                   ) : (
                     consoleLogs.map((entry, index) => (
-                      <div key={`${entry.timestamp}-${index}`} className="mb-3">
-                        <p className="text-foreground/50">
+                      <details key={`${entry.timestamp}-${index}`} className="mb-1 group">
+                        <summary className="flex cursor-pointer items-center gap-1.5 rounded px-1 py-0.5 hover:bg-white/5 select-none list-none">
+                          <ChevronDown className="h-3 w-3 text-foreground/40 transition-transform group-open:rotate-0 -rotate-90" />
                           <span className="text-foreground/60">{entry.timestamp}</span>
-                          {" | "}
                           <span className="font-semibold text-primary">{entry.nodeName}</span>
-                        </p>
-                        <pre className="mt-1 whitespace-pre-wrap break-all rounded-md border border-border/50 bg-black/30 p-2.5 text-foreground/80">
+                        </summary>
+                        <pre className="mt-1 mb-2 ml-[18px] whitespace-pre-wrap break-all rounded-md border border-border/50 bg-black/30 p-2.5 text-foreground/80">
                           {stringifyConsoleOutput(entry.output)}
                         </pre>
-                      </div>
+                      </details>
                     ))
                   )}
                   <div ref={consoleEndRef} />
@@ -2491,6 +2665,11 @@ export default function HomePage() {
           }
           setNodeRepeat(editingNode.id, value);
         }}
+        listNodeName={(() => {
+          if (!editingNode) return undefined;
+          const ref = getListReference(editingNode, nodes);
+          return ref ? (nodes[ref.listNodeId]?.name ?? "List") : undefined;
+        })()}
       />
     </div>
   );

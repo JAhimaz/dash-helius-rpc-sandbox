@@ -339,6 +339,19 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
         return state;
       }
 
+      // Enforce single List reference per node
+      if (value.type === "ref") {
+        const refNode = state.nodes[value.nodeId];
+        if (refNode?.method === "List") {
+          const hasOtherListRef = node.params.some(
+            (p) => p.name !== paramName && p.value.type === "ref" && state.nodes[p.value.nodeId]?.method === "List",
+          );
+          if (hasOtherListRef) {
+            return state;
+          }
+        }
+      }
+
       const existing = node.params.find((param) => param.name === paramName);
       const params = existing
         ? node.params.map((param) =>

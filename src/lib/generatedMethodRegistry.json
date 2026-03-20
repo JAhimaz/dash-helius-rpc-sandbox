@@ -5409,6 +5409,109 @@
       "errors": []
     },
     {
+      "method": "Value Aggregator",
+      "docsUrl": "#custom/value-aggregator",
+      "category": "custom",
+      "transport": "custom",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "value",
+            "type": "number",
+            "required": true,
+            "description": "The incoming value to aggregate. Use a reference to pull from a prior node."
+          },
+          {
+            "name": "operation",
+            "type": "string",
+            "required": true,
+            "description": "The aggregation operation to apply: add, subtract, multiply, divide."
+          },
+          {
+            "name": "initialValue",
+            "type": "number",
+            "required": false,
+            "description": "Starting value for the accumulator. Defaults to 0."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "accumulated": 150,
+          "lastValue": 50,
+          "operation": "add",
+          "iterations": 3
+        }
+      },
+      "errors": []
+    },
+    {
+      "method": "List",
+      "docsUrl": "#custom/list",
+      "category": "custom",
+      "transport": "custom",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "value",
+            "type": "any",
+            "required": true,
+            "description": "An array to iterate over. Use a reference to pull an array from a prior node output."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": [{"item": 1}, {"item": 2}, {"item": 3}]
+      },
+      "errors": []
+    },
+    {
+      "method": "Arithmetic",
+      "docsUrl": "#custom/arithmetic",
+      "category": "custom",
+      "transport": "custom",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "input",
+            "type": "number",
+            "required": true,
+            "description": "The input value. Use a reference to pull from a prior node."
+          },
+          {
+            "name": "operation",
+            "type": "string",
+            "required": true,
+            "description": "The arithmetic operation: add, subtract, multiply, divide."
+          },
+          {
+            "name": "operand",
+            "type": "number",
+            "required": true,
+            "description": "The value to operate against the input."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "input": 100,
+          "operation": "multiply",
+          "operand": 2,
+          "result": 200
+        }
+      },
+      "errors": []
+    },
+    {
       "method": "Log Output",
       "docsUrl": "#custom/log-output",
       "category": "custom",

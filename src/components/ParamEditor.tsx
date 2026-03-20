@@ -1,8 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { JsonPathPicker } from "@/components/JsonPathPicker";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { MethodRegistryEntry } from "@/lib/methodRegistry";
@@ -23,6 +26,7 @@ const CUSTOM_LITERAL_SENTINEL = "__custom_input__";
 const PREDEFINED_LITERAL_OPTIONS: Record<string, string[]> = {
   commitment: ["processed", "confirmed", "finalized"],
   encoding: ["base58", "base64", "base64+zstd", "jsonParsed", "json"],
+  operation: ["add", "subtract", "multiply", "divide"],
   subscriptionmethod: [
     "accountSubscribe",
     "logsSubscribe",
@@ -114,6 +118,44 @@ function parseLiteralInput(raw: string): unknown {
   }
 }
 
+function LiteralTextarea({
+  storeValue,
+  onChange,
+  placeholder,
+  className,
+}: {
+  storeValue: unknown;
+  onChange: (value: unknown) => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  const [localValue, setLocalValue] = useState(() => serializeLiteral(storeValue));
+  const focusedRef = useRef(false);
+
+  useEffect(() => {
+    if (!focusedRef.current) {
+      setLocalValue(serializeLiteral(storeValue));
+    }
+  }, [storeValue]);
+
+  return (
+    <Textarea
+      className={className}
+      value={localValue}
+      onChange={(event) => {
+        setLocalValue(event.target.value);
+        onChange(parseLiteralInput(event.target.value));
+      }}
+      onFocus={() => { focusedRef.current = true; }}
+      onBlur={() => {
+        focusedRef.current = false;
+        setLocalValue(serializeLiteral(storeValue));
+      }}
+      placeholder={placeholder}
+    />
+  );
+}
+
 export function ParamEditor({
   node,
   methodEntry,
@@ -165,6 +207,107 @@ export function ParamEditor({
           placeholder='{"id":"assetMintAddress"}'
         />
         <p className="text-xs text-foreground/65">Unknown schema: enter params as valid JSON (object or array).</p>
+      </div>
+    );
+  }
+
+  if (methodEntry?.method === "List") {
+    const listParam = node.params.find((p) => p.name === "value") ?? {
+      name: "value",
+      value: { type: "literal", value: null } as ParamValue,
+    };
+    const isRef = listParam.value.type === "ref";
+    const listValue = listParam.value.type === "literal" ? listParam.value.value : null;
+    const items: unknown[] = Array.isArray(listValue) ? listValue : [];
+
+    const updateItems = (next: unknown[]) => {
+      onParamChange("value", { type: "literal", value: next });
+    };
+
+    return (
+      <div className="space-y-3">
+        <div className="space-y-2 rounded-md border border-border p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-medium text-foreground">List Items</p>
+              <p className="text-xs text-foreground/65">
+                {isRef ? "Referencing an array from another node." : "Each row is one item in the array."}
+              </p>
+            </div>
+            <select
+              className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+              value={isRef ? "ref" : "literal"}
+              onChange={(event) => {
+                if (event.target.value === "ref") {
+                  if (sourceNodes.length === 0) return;
+                  onParamChange("value", { type: "ref", nodeId: sourceNodes[0]?.id ?? "", path: "" });
+                } else {
+                  onParamChange("value", { type: "literal", value: [] });
+                }
+              }}
+            >
+              <option value="literal">Manual</option>
+              <option value="ref" disabled={sourceNodes.length === 0}>Reference</option>
+            </select>
+          </div>
+
+          {isRef && listParam.value.type === "ref" ? (
+            <JsonPathPicker
+              sourceNodes={sourceNodes}
+              selectedNodeId={listParam.value.nodeId}
+              selectedPath={listParam.value.path}
+              onChange={(value) => {
+                onParamChange("value", { type: "ref", nodeId: value.nodeId, path: value.path });
+              }}
+            />
+          ) : (
+            <>
+              <div className="space-y-2">
+                {items.map((item, index) => (
+                  <div key={`list-item-${index}`} className="flex items-center gap-2">
+                    <span className="w-6 text-right font-mono text-[11px] text-foreground/40">{index + 1}</span>
+                    <Input
+                      className="flex-1 font-mono text-xs"
+                      value={typeof item === "string" ? item : JSON.stringify(item)}
+                      onChange={(event) => {
+                        const next = [...items];
+                        const raw = event.target.value.trim();
+                        try {
+                          next[index] = JSON.parse(raw);
+                        } catch {
+                          next[index] = event.target.value;
+                        }
+                        updateItems(next);
+                      }}
+                      placeholder="Value"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 w-8 shrink-0 p-0 text-foreground/50 hover:text-destructive"
+                      onClick={() => {
+                        const next = items.filter((_, i) => i !== index);
+                        updateItems(next);
+                      }}
+                      aria-label="Remove item"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full text-xs"
+                onClick={() => updateItems([...items, ""])}
+              >
+                <Plus className="mr-1 h-3 w-3" />
+                Add Item
+              </Button>
+            </>
+          )}
+        </div>
       </div>
     );
   }
@@ -315,13 +458,13 @@ export function ParamEditor({
                 ) : null}
 
                 {!isBooleanField && (!presetOptions || presetSelectValue === CUSTOM_LITERAL_OPTION) ? (
-                  <Textarea
+                  <LiteralTextarea
                     className="min-h-16 font-mono text-xs"
-                    value={isCustomSentinel ? "" : serializeLiteral(param.value.value)}
-                    onChange={(event) => {
+                    storeValue={isCustomSentinel ? "" : param.value.value}
+                    onChange={(value) => {
                       onParamChange(field.name, {
                         type: "literal",
-                        value: parseLiteralInput(event.target.value),
+                        value,
                       });
                     }}
                     placeholder="JSON value or plain text"

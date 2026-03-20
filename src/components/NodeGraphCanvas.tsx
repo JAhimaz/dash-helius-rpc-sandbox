@@ -301,12 +301,65 @@ export function NodeGraphCanvas({
             const outgoingIndex = outgoing.findIndex((candidate) => candidate.id === connection.id);
             const incomingIndex = incoming.findIndex((candidate) => candidate.id === connection.id);
 
-            const startX = source.position.x + NODE_WIDTH;
-            const startY = source.position.y + NODE_HEIGHT / 2 + connectorOffset(outgoingIndex, Math.max(1, outgoing.length));
-            const endX = target.position.x;
-            const endY = target.position.y + NODE_HEIGHT / 2 + connectorOffset(incomingIndex, Math.max(1, incoming.length));
-            const controlDistance = Math.max(70, Math.abs(endX - startX) * 0.4);
-            const pathD = `M ${startX} ${startY} C ${startX + controlDistance} ${startY}, ${endX - controlDistance} ${endY}, ${endX} ${endY}`;
+            const sourceCX = source.position.x + NODE_WIDTH / 2;
+            const sourceCY = source.position.y + NODE_HEIGHT / 2;
+            const targetCX = target.position.x + NODE_WIDTH / 2;
+            const targetCY = target.position.y + NODE_HEIGHT / 2;
+            const dx = targetCX - sourceCX;
+            const dy = targetCY - sourceCY;
+
+            let startX: number;
+            let startY: number;
+            let startDirX: number;
+            let startDirY: number;
+            let endX: number;
+            let endY: number;
+            let endDirX: number;
+            let endDirY: number;
+
+            const outOff = connectorOffset(outgoingIndex, Math.max(1, outgoing.length));
+            const inOff = connectorOffset(incomingIndex, Math.max(1, incoming.length));
+
+            if (Math.abs(dx) >= Math.abs(dy)) {
+              if (dx >= 0) {
+                // target is to the right
+                startX = source.position.x + NODE_WIDTH;
+                startY = sourceCY + outOff;
+                startDirX = 1; startDirY = 0;
+                endX = target.position.x;
+                endY = targetCY + inOff;
+                endDirX = -1; endDirY = 0;
+              } else {
+                // target is to the left
+                startX = source.position.x;
+                startY = sourceCY + outOff;
+                startDirX = -1; startDirY = 0;
+                endX = target.position.x + NODE_WIDTH;
+                endY = targetCY + inOff;
+                endDirX = 1; endDirY = 0;
+              }
+            } else {
+              if (dy >= 0) {
+                // target is below
+                startX = sourceCX + outOff;
+                startY = source.position.y + NODE_HEIGHT;
+                startDirX = 0; startDirY = 1;
+                endX = targetCX + inOff;
+                endY = target.position.y;
+                endDirX = 0; endDirY = -1;
+              } else {
+                // target is above
+                startX = sourceCX + outOff;
+                startY = source.position.y;
+                startDirX = 0; startDirY = -1;
+                endX = targetCX + inOff;
+                endY = target.position.y + NODE_HEIGHT;
+                endDirX = 0; endDirY = 1;
+              }
+            }
+
+            const dist = Math.max(70, Math.sqrt(dx * dx + dy * dy) * 0.4);
+            const pathD = `M ${startX} ${startY} C ${startX + startDirX * dist} ${startY + startDirY * dist}, ${endX + endDirX * dist} ${endY + endDirY * dist}, ${endX} ${endY}`;
             const color = EDGE_COLORS[index % EDGE_COLORS.length];
 
             return (
@@ -397,6 +450,20 @@ export function NodeGraphCanvas({
                     <p className="mt-1 text-[11px] text-foreground/50">#{executionOrder ?? "-"}</p>
                   </div>
                 </div>
+
+                {node.method === "Value Aggregator" && node.output != null && typeof node.output === "object" && "accumulated" in (node.output as Record<string, unknown>) ? (
+                  <p className="truncate text-center font-mono text-sm font-semibold text-primary">
+                    {String((node.output as { accumulated: unknown }).accumulated)}
+                  </p>
+                ) : node.method === "Arithmetic" && node.output != null && typeof node.output === "object" && "result" in (node.output as Record<string, unknown>) ? (
+                  <p className="truncate text-center font-mono text-sm font-semibold text-primary">
+                    {String((node.output as { result: unknown }).result)}
+                  </p>
+                ) : node.method === "List" ? (
+                  <p className="truncate text-center font-mono text-[11px] text-foreground/50">
+                    {Array.isArray(node.output) ? `${node.output.length} items` : "0 items"}
+                  </p>
+                ) : null}
 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
