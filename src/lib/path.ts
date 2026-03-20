@@ -1,14 +1,18 @@
-function tokenizePath(path: string): Array<string | number> {
-  const tokens: Array<string | number> = [];
-  const matcher = /([^.[\]]+)|(\[(\d+)\])/g;
+function tokenizePath(path: string): Array<string | number | "[]"> {
+  const tokens: Array<string | number | "[]"> = [];
+  const matcher = /(\[\])|([^.[\]]+)|(\[(\d+)\])/g;
 
   for (const match of path.matchAll(matcher)) {
     if (match[1]) {
-      tokens.push(match[1]);
+      tokens.push("[]");
       continue;
     }
-    if (match[3]) {
-      tokens.push(Number(match[3]));
+    if (match[2]) {
+      tokens.push(match[2]);
+      continue;
+    }
+    if (match[4]) {
+      tokens.push(Number(match[4]));
     }
   }
 
@@ -23,9 +27,26 @@ export function getByPath(obj: unknown, path: string): unknown {
   const tokens = tokenizePath(path);
   let current: unknown = obj;
 
-  for (const token of tokens) {
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = tokens[i];
     if (current === null || current === undefined) {
       return undefined;
+    }
+
+    if (token === "[]") {
+      // Array spread marker. If current is already a single item
+      // (List iteration unwrapped it), just skip. If current is still
+      // an array, map remaining path over each element.
+      if (Array.isArray(current)) {
+        const remainingTokens = tokens.slice(i + 1);
+        if (remainingTokens.length === 0) continue;
+        const remainingPath = remainingTokens
+          .map((t) => (typeof t === "number" ? `[${t}]` : t === "[]" ? "[]" : `.${t}`))
+          .join("")
+          .replace(/^\./, "");
+        return current.map((item) => getByPath(item, remainingPath));
+      }
+      continue;
     }
 
     if (typeof token === "number") {
@@ -91,6 +112,7 @@ export function formatPathForDisplay(path: string): string {
   }
 
   return path
+    .replace(/\[\]/g, " -> [each]")
     .replace(/\./g, " -> ")
     .replace(/\[(\d+)\]/g, " -> [$1]")
     .replace(/^ -> /, "");

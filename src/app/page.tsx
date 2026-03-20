@@ -480,6 +480,18 @@ function getMethodCategoryId(entry: MethodRegistryEntry): MethodCategoryId {
   return entry.category ?? "solana-rpc-apis";
 }
 
+function setNestedValue(obj: unknown, path: string, value: unknown): void {
+  const keys = path.split(".");
+  let current: unknown = obj;
+  for (let i = 0; i < keys.length - 1; i += 1) {
+    if (typeof current !== "object" || current === null) return;
+    current = (current as Record<string, unknown>)[keys[i]];
+  }
+  if (typeof current === "object" && current !== null) {
+    (current as Record<string, unknown>)[keys[keys.length - 1]] = value;
+  }
+}
+
 function getCustomNodeOutput(node: WorkflowNode, outputsByNodeId: Map<string, unknown>): unknown {
   const valueParam = node.params.find((param) => param.name === "value");
   if (!valueParam) {
@@ -496,7 +508,12 @@ function getListReference(
   for (const param of node.params) {
     if (param.value.type === "ref") {
       const refNode = nodes[param.value.nodeId];
+      // Explicit List node reference
       if (refNode?.method === "List") {
+        return { paramName: param.name, listNodeId: param.value.nodeId, path: param.value.path };
+      }
+      // [each] path on any node — treat the referenced node as a list source
+      if (param.value.path.includes("[]")) {
         return { paramName: param.name, listNodeId: param.value.nodeId, path: param.value.path };
       }
     }
@@ -1814,8 +1831,19 @@ export default function HomePage() {
           // Check if this node references a List node
           const listRef = getListReference(node, useWorkflowStore.getState().nodes);
           if (listRef) {
-            const listOutput = outputsByNodeId.get(listRef.listNodeId);
-            const listArray = Array.isArray(listOutput) ? listOutput : [];
+            const rawListOutput = outputsByNodeId.get(listRef.listNodeId);
+
+            // For [each] paths, resolve the path prefix up to [] to get the array
+            let listArray: unknown[];
+            const eachIndex = listRef.path.indexOf("[]");
+            if (eachIndex > 0) {
+              const arrayPath = listRef.path.slice(0, eachIndex).replace(/\.$/, "");
+              const resolved = getByPath(rawListOutput, arrayPath);
+              listArray = Array.isArray(resolved) ? resolved : [];
+            } else {
+              listArray = Array.isArray(rawListOutput) ? rawListOutput : [];
+            }
+
             if (listArray.length === 0) {
               setNodeStatus(nodeId, "error", "List is empty.");
               return { success: false, failedNodeId: nodeId, failedNodeName: node.name, errorMessage: "List is empty." };
@@ -1836,12 +1864,22 @@ export default function HomePage() {
 
             const originalListOutput = outputsByNodeId.get(listRef.listNodeId);
 
+            const arrayPrefix = eachIndex > 0 ? listRef.path.slice(0, eachIndex).replace(/\.$/, "") : "";
+
             for (let i = 0; i < listArray.length; i += 1) {
               if (executionController.signal.aborted) {
                 return { success: false, canceled: true, errorMessage: "Execution stopped by user." };
               }
 
-              outputsByNodeId.set(listRef.listNodeId, listArray[i]);
+              if (eachIndex >= 0 && arrayPrefix) {
+                // For [each] paths: rebuild the source output with the array replaced
+                // by the single item so [] skips (non-array) and remaining path resolves
+                const cloned = JSON.parse(JSON.stringify(rawListOutput));
+                setNestedValue(cloned, arrayPrefix, listArray[i]);
+                outputsByNodeId.set(listRef.listNodeId, cloned);
+              } else {
+                outputsByNodeId.set(listRef.listNodeId, listArray[i]);
+              }
 
               const result = await executeSingleNode(nodeId, outputsByNodeId, executionController.signal);
               if (!result.success) return result;

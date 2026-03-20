@@ -126,7 +126,7 @@ export function NodeSettingsDialog({
       role="presentation"
     >
       <section
-        className="max-h-[80vh] w-full max-w-4xl overflow-hidden rounded-xl border border-border bg-background shadow-2xl shadow-black/30"
+        className="max-h-[85vh] w-full max-w-5xl overflow-hidden rounded-xl border border-border bg-background shadow-2xl shadow-black/30"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
@@ -163,7 +163,7 @@ export function NodeSettingsDialog({
           </div>
         </header>
 
-        <div data-dialog-scroll className="max-h-[calc(80vh-57px)] overflow-auto overscroll-contain p-4">
+        <div data-dialog-scroll className="max-h-[calc(85vh-57px)] overflow-auto overscroll-contain p-4">
           {listNodeName ? (
           <div className="mb-4 rounded-md border border-primary/30 bg-primary/10 p-3">
             <div className="flex items-center gap-2 text-xs text-foreground/85">
@@ -245,7 +245,7 @@ export function NodeSettingsDialog({
           ) : null}
 
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="flex h-[380px] flex-col rounded-md border border-border bg-background/60 p-3">
+            <div className="flex h-[420px] flex-col rounded-md border border-border bg-background/60 p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-foreground/65">Input</p>
               <div data-dialog-scroll className="mt-3 min-h-0 flex-1 overflow-auto overscroll-contain pr-1">
                 {methodEntry?.schema === "unknown" ? (
@@ -263,7 +263,7 @@ export function NodeSettingsDialog({
               </div>
             </div>
 
-            <div className="flex h-[380px] flex-col rounded-md border border-border bg-background/60 p-3">
+            <div className="flex h-[420px] flex-col rounded-md border border-border bg-background/60 p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-foreground/65">Output</p>
               <div data-dialog-scroll className="mt-3 min-h-0 flex-1 overflow-auto overscroll-contain pr-1">
                 {node.error ? (
