@@ -400,8 +400,10 @@ export function NodeGraphCanvas({
 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className={cn("h-2.5 w-2.5 rounded-full", statusClass(node.status))} />
-                    <span className="text-[11px] uppercase tracking-wide text-foreground/70">{node.status}</span>
+                    <span className={cn("h-2.5 w-2.5 rounded-full", node.status === "running" && node.method === "WebSocket" ? "bg-success" : statusClass(node.status))} />
+                    <span className="text-[11px] uppercase tracking-wide text-foreground/70">
+                      {node.status === "running" && node.method === "WebSocket" ? "live" : node.status}
+                    </span>
                   </div>
                   <div className="flex items-center gap-1">
                     <QuickTooltip content="Delete node">

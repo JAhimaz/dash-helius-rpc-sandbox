@@ -18,10 +18,56 @@ interface ParamEditorProps {
 }
 
 const CUSTOM_LITERAL_OPTION = "__custom__";
+const CUSTOM_LITERAL_SENTINEL = "__custom_input__";
 
 const PREDEFINED_LITERAL_OPTIONS: Record<string, string[]> = {
   commitment: ["processed", "confirmed", "finalized"],
   encoding: ["base58", "base64", "base64+zstd", "jsonParsed", "json"],
+  subscriptionmethod: [
+    "accountSubscribe",
+    "logsSubscribe",
+    "programSubscribe",
+    "slotSubscribe",
+    "rootSubscribe",
+    "signatureSubscribe",
+    "blockSubscribe",
+  ],
+};
+
+interface DynamicField {
+  name: string;
+  type: string;
+  required: boolean;
+  description: string;
+}
+
+const WS_SUBSCRIPTION_FIELDS: Record<string, DynamicField[]> = {
+  accountSubscribe: [
+    { name: "pubkey", type: "string", required: true, description: "Account public key to monitor." },
+    { name: "commitment", type: "string", required: false, description: "Commitment level. finalized | confirmed | processed" },
+    { name: "encoding", type: "string", required: false, description: "Encoding format. base58 | base64 | base64+zstd | jsonParsed" },
+  ],
+  logsSubscribe: [
+    { name: "filter", type: "string", required: true, description: "Filter type: \"all\", \"allWithVotes\", or a program public key." },
+    { name: "commitment", type: "string", required: false, description: "Commitment level. finalized | confirmed | processed" },
+  ],
+  programSubscribe: [
+    { name: "programId", type: "string", required: true, description: "Program public key." },
+    { name: "commitment", type: "string", required: false, description: "Commitment level. finalized | confirmed | processed" },
+    { name: "encoding", type: "string", required: false, description: "Encoding format. base58 | base64 | base64+zstd | jsonParsed" },
+    { name: "filters", type: "json", required: false, description: "Array of filter objects. e.g. [{\"dataSize\": 80}]" },
+  ],
+  signatureSubscribe: [
+    { name: "signature", type: "string", required: true, description: "Transaction signature to monitor." },
+    { name: "commitment", type: "string", required: false, description: "Commitment level. finalized | confirmed | processed" },
+  ],
+  blockSubscribe: [
+    { name: "filter", type: "string", required: true, description: "Filter: \"all\" or a JSON object like {\"mentionsAccountOrProgram\": \"<pubkey>\"}." },
+    { name: "commitment", type: "string", required: false, description: "Commitment level. finalized | confirmed | processed" },
+    { name: "encoding", type: "string", required: false, description: "Encoding format. base58 | base64 | base64+zstd | jsonParsed" },
+  ],
+  slotSubscribe: [],
+  rootSubscribe: [],
 };
 
 function getPresetOptions(fieldName: string): string[] | undefined {
@@ -75,13 +121,37 @@ export function ParamEditor({
   onParamChange,
   onRawParamsChange,
 }: ParamEditorProps) {
+  const selectedSubscriptionMethod = useMemo(() => {
+    if (methodEntry?.transport !== "websocket") return null;
+    const param = node.params.find((p) => p.name === "subscriptionMethod");
+    if (!param || param.value.type !== "literal") return null;
+    const val = param.value.value;
+    return typeof val === "string" && val !== CUSTOM_LITERAL_SENTINEL && val.length > 0 ? val : null;
+  }, [methodEntry, node.params]);
+
   const tableSchema = useMemo(() => {
     if (methodEntry?.params?.kind !== "table") {
       return null;
     }
 
+    if (methodEntry.transport === "websocket" && selectedSubscriptionMethod) {
+      const dynamicFields = WS_SUBSCRIPTION_FIELDS[selectedSubscriptionMethod] ?? [];
+      const staticFields = methodEntry.params.fields;
+      const subscriptionMethodField = staticFields.find((f) => f.name === "subscriptionMethod");
+      const extraParamsField = staticFields.find((f) => f.name === "extraParams");
+
+      return {
+        kind: "table" as const,
+        fields: [
+          ...(subscriptionMethodField ? [subscriptionMethodField] : []),
+          ...dynamicFields,
+          ...(extraParamsField ? [extraParamsField] : []),
+        ],
+      };
+    }
+
     return methodEntry.params;
-  }, [methodEntry]);
+  }, [methodEntry, selectedSubscriptionMethod]);
 
   if (!tableSchema) {
     return (
@@ -113,12 +183,17 @@ export function ParamEditor({
           presetOptions &&
           typeof literalValue === "string" &&
           presetOptions.includes(literalValue);
+        const isCustomSentinel = typeof literalValue === "string" && literalValue === CUSTOM_LITERAL_SENTINEL;
         const presetSelectValue =
-          literalValue === null || literalValue === undefined || literalValue === ""
+          literalValue === null || literalValue === undefined
             ? ""
-            : isPresetLiteral
-              ? (literalValue as string)
-              : CUSTOM_LITERAL_OPTION;
+            : isCustomSentinel || (typeof literalValue === "string" && literalValue === "")
+              ? CUSTOM_LITERAL_OPTION
+              : isPresetLiteral
+                ? (literalValue as string)
+                : typeof literalValue === "string" && literalValue.length > 0 && !isPresetLiteral
+                  ? CUSTOM_LITERAL_OPTION
+                  : "";
 
         return (
           <div key={`${node.id}-${field.name}`} className="space-y-2 rounded-md border border-border p-3">
@@ -218,7 +293,7 @@ export function ParamEditor({
                       if (event.target.value === CUSTOM_LITERAL_OPTION) {
                         onParamChange(field.name, {
                           type: "literal",
-                          value: typeof literalValue === "string" && !isPresetLiteral ? literalValue : "",
+                          value: typeof literalValue === "string" && !isPresetLiteral && !isCustomSentinel ? literalValue : CUSTOM_LITERAL_SENTINEL,
                         });
                         return;
                       }
@@ -242,7 +317,7 @@ export function ParamEditor({
                 {!isBooleanField && (!presetOptions || presetSelectValue === CUSTOM_LITERAL_OPTION) ? (
                   <Textarea
                     className="min-h-16 font-mono text-xs"
-                    value={serializeLiteral(param.value.value)}
+                    value={isCustomSentinel ? "" : serializeLiteral(param.value.value)}
                     onChange={(event) => {
                       onParamChange(field.name, {
                         type: "literal",

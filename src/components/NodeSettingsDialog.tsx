@@ -80,9 +80,9 @@ export function NodeSettingsDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" onMouseDown={onClose} role="presentation">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-6 backdrop-blur-sm" onMouseDown={onClose} role="presentation">
       <section
-        className="max-h-[90vh] w-full max-w-6xl overflow-hidden rounded-xl border border-border bg-background shadow-2xl shadow-black/45"
+        className="max-h-[80vh] w-full max-w-4xl overflow-hidden rounded-xl border border-border bg-background shadow-2xl shadow-black/30"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
@@ -103,7 +103,9 @@ export function NodeSettingsDialog({
           </div>
 
           <div className="flex items-center gap-2">
-            <Badge variant={statusVariant(node.status)}>{node.status}</Badge>
+            <Badge variant={node.status === "running" && methodEntry?.transport === "websocket" ? "success" : statusVariant(node.status)}>
+              {node.status === "running" && methodEntry?.transport === "websocket" ? "live" : node.status}
+            </Badge>
             <QuickTooltip content="Delete this node">
               <Button size="sm" variant="destructive" className="h-8 w-8 p-0" onClick={onDelete} aria-label="Delete this node">
                 <Trash2 className="h-3.5 w-3.5" />
@@ -117,7 +119,8 @@ export function NodeSettingsDialog({
           </div>
         </header>
 
-        <div className="max-h-[calc(90vh-57px)] overflow-auto p-4">
+        <div className="max-h-[calc(80vh-57px)] overflow-auto p-4">
+          {methodEntry?.transport !== "websocket" && (
           <div className="mb-4 rounded-md border border-border bg-background/55 p-3">
             <div className="mb-2 flex items-center gap-2 text-xs text-foreground/85">
               <Checkbox
@@ -184,9 +187,10 @@ export function NodeSettingsDialog({
               </label>
             </div>
           </div>
+          )}
 
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="flex h-[520px] flex-col rounded-md border border-border bg-background/60 p-3">
+            <div className="flex h-[380px] flex-col rounded-md border border-border bg-background/60 p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-foreground/65">Input</p>
               <div className="mt-3 min-h-0 flex-1 overflow-auto pr-1">
                 {methodEntry?.schema === "unknown" ? (
@@ -204,7 +208,7 @@ export function NodeSettingsDialog({
               </div>
             </div>
 
-            <div className="flex h-[520px] flex-col rounded-md border border-border bg-background/60 p-3">
+            <div className="flex h-[380px] flex-col rounded-md border border-border bg-background/60 p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-foreground/65">Output</p>
               <div className="mt-3 min-h-0 flex-1 overflow-auto pr-1">
                 {node.error ? (

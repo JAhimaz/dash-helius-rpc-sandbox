@@ -124,6 +124,7 @@ export function NodeCard({
               placeholder="Node Name"
               aria-label="Node Name"
             />
+            {methodEntry?.transport !== "websocket" && (
             <div className="relative">
               <QuickTooltip content="Configure repeat run">
                 <Button
@@ -209,12 +210,15 @@ export function NodeCard({
                 </div>
               ) : null}
             </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <span className="rounded border border-border bg-background/50 px-2 py-0.5 font-mono text-[11px] text-foreground/75">
               {callCount} / {callTarget === null ? "-" : callTarget}
             </span>
-            <Badge variant={statusVariant(node.status)}>{node.status}</Badge>
+            <Badge variant={node.status === "running" && methodEntry?.transport === "websocket" ? "success" : statusVariant(node.status)}>
+              {node.status === "running" && methodEntry?.transport === "websocket" ? "live" : node.status}
+            </Badge>
             <QuickTooltip content="Delete this node">
               <Button
                 size="sm"

@@ -4715,6 +4715,661 @@
       ]
     },
     {
+      "method": "getCompressedAccount",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/zk-compression/getcompressedaccount",
+      "category": "zk-compression",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "address",
+            "type": "string",
+            "required": false,
+            "description": "The Solana public key of the compressed account to retrieve data for."
+          },
+          {
+            "name": "hash",
+            "type": "string",
+            "required": false,
+            "description": "The data hash identifier of the compressed Solana account if the address is not available."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "context": { "slot": 100 },
+          "value": {
+            "hash": "11111112cMQwSC9qirWGjZM6gLGwW69X22mqwLLGP",
+            "owner": "11111112D1oxKts8YPdTJRG5FzxTNpMtWmq8hkVx3",
+            "lamports": 100,
+            "tree": "11111112D1oxKts8YPdTJRG5FzxTNpMtWmq8hkVx3",
+            "leafIndex": 0,
+            "seq": 0,
+            "slotCreated": 100
+          }
+        }
+      },
+      "errors": []
+    },
+    {
+      "method": "getCompressedAccountProof",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/zk-compression/getcompressedaccountproof",
+      "category": "zk-compression",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "hash",
+            "type": "string",
+            "required": true,
+            "description": "A 32-byte cryptographic hash represented as a base58 string, uniquely identifying a Solana compressed account."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "context": { "slot": 100 },
+          "value": {
+            "hash": "11111112cMQwSC9qirWGjZM6gLGwW69X22mqwLLGP",
+            "root": "11111112cMQwSC9qirWGjZM6gLGwW69X22mqwLLGP",
+            "proof": [],
+            "leafIndex": 0,
+            "merkleTree": "11111117353mdUKehx9GW6JNHznGt5oSZs9fWkVkB",
+            "rootSeq": 0
+          }
+        }
+      },
+      "errors": []
+    },
+    {
+      "method": "getCompressedAccountsByOwner",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/zk-compression/getcompressedaccountsbyowner",
+      "category": "zk-compression",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "string",
+            "required": true,
+            "description": "A Solana public key represented as a base58 string."
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "required": false,
+            "description": "A 32-byte hash represented as a base58 string for pagination."
+          },
+          {
+            "name": "limit",
+            "type": "number",
+            "required": false,
+            "description": "Maximum number of accounts to return."
+          },
+          {
+            "name": "dataSlice",
+            "type": "object",
+            "required": false,
+            "description": "Request a slice of the account data. Object with offset and length."
+          },
+          {
+            "name": "dataSlice.offset",
+            "type": "number",
+            "required": false,
+            "description": "Byte offset from which to start reading."
+          },
+          {
+            "name": "dataSlice.length",
+            "type": "number",
+            "required": false,
+            "description": "Number of bytes to return."
+          },
+          {
+            "name": "filters",
+            "type": "json",
+            "required": false,
+            "description": "Array of filter objects for memcmp filtering."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "context": { "slot": 100 },
+          "value": {
+            "items": [],
+            "cursor": null
+          }
+        }
+      },
+      "errors": []
+    },
+    {
+      "method": "getCompressedBalance",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/zk-compression/getcompressedbalance",
+      "category": "zk-compression",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "address",
+            "type": "string",
+            "required": false,
+            "description": "A Solana public key represented as a base58 string."
+          },
+          {
+            "name": "hash",
+            "type": "string",
+            "required": false,
+            "description": "A 32-byte hash represented as a base58 string."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": { "context": { "slot": 100 }, "value": 100 }
+      },
+      "errors": []
+    },
+    {
+      "method": "getCompressedBalanceByOwner",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/zk-compression/getcompressedbalancebyowner",
+      "category": "zk-compression",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "string",
+            "required": true,
+            "description": "A Solana public key represented as a base58 string."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": { "context": { "slot": 100 }, "value": 100 }
+      },
+      "errors": []
+    },
+    {
+      "method": "getCompressedMintTokenHolders",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/zk-compression/getcompressedminttokenholders",
+      "category": "zk-compression",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "string",
+            "required": true,
+            "description": "A Solana public key represented as a base58 string."
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "required": false,
+            "description": "A base58 encoded string for pagination."
+          },
+          {
+            "name": "limit",
+            "type": "number",
+            "required": false,
+            "description": "Maximum number of results to return."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": { "context": { "slot": 100 }, "value": { "items": [], "cursor": null } }
+      },
+      "errors": []
+    },
+    {
+      "method": "getCompressedTokenAccountBalance",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/zk-compression/getcompressedtokenaccountbalance",
+      "category": "zk-compression",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "address",
+            "type": "string",
+            "required": false,
+            "description": "A Solana public key represented as a base58 string."
+          },
+          {
+            "name": "hash",
+            "type": "string",
+            "required": false,
+            "description": "A 32-byte hash represented as a base58 string."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": { "context": { "slot": 100 }, "value": { "amount": 100 } }
+      },
+      "errors": []
+    },
+    {
+      "method": "getCompressedTokenAccountsByDelegate",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/zk-compression/getcompressedtokenaccountsbydelegate",
+      "category": "zk-compression",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "delegate",
+            "type": "string",
+            "required": true,
+            "description": "A Solana public key represented as a base58 string."
+          },
+          {
+            "name": "mint",
+            "type": "string",
+            "required": false,
+            "description": "Filter by mint address. A Solana public key represented as a base58 string."
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "required": false,
+            "description": "A base58 encoded string for pagination."
+          },
+          {
+            "name": "limit",
+            "type": "number",
+            "required": false,
+            "description": "Maximum number of results to return."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": { "context": { "slot": 100 }, "value": { "items": [], "cursor": null } }
+      },
+      "errors": []
+    },
+    {
+      "method": "getCompressedTokenAccountsByOwner",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/zk-compression/getcompressedtokenaccountsbyowner",
+      "category": "zk-compression",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "string",
+            "required": true,
+            "description": "The Solana wallet address that owns the compressed token accounts."
+          },
+          {
+            "name": "mint",
+            "type": "string",
+            "required": false,
+            "description": "Filter by specific Solana token mint address."
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "required": false,
+            "description": "Pagination cursor for retrieving subsequent sets of results."
+          },
+          {
+            "name": "limit",
+            "type": "number",
+            "required": false,
+            "description": "Maximum number of compressed token accounts to return."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": { "context": { "slot": 100 }, "value": { "items": [], "cursor": null } }
+      },
+      "errors": []
+    },
+    {
+      "method": "getCompressedTokenBalancesByOwner",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/zk-compression/getcompressedtokenbalancesbyowner",
+      "category": "zk-compression",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "string",
+            "required": true,
+            "description": "A Solana public key represented as a base58 string."
+          },
+          {
+            "name": "mint",
+            "type": "string",
+            "required": false,
+            "description": "Filter by specific token mint address."
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "required": false,
+            "description": "A base58 encoded string for pagination."
+          },
+          {
+            "name": "limit",
+            "type": "number",
+            "required": false,
+            "description": "Maximum number of results to return."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": { "context": { "slot": 100 }, "value": { "token_balances": [], "cursor": null } }
+      },
+      "errors": []
+    },
+    {
+      "method": "getCompressedTokenBalancesByOwnerV2",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/zk-compression/getcompressedtokenbalancesbyownerv2",
+      "category": "zk-compression",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "string",
+            "required": true,
+            "description": "A Solana public key represented as a base58 string."
+          },
+          {
+            "name": "mint",
+            "type": "string",
+            "required": false,
+            "description": "Filter by specific token mint address."
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "required": false,
+            "description": "A base58 encoded string for pagination."
+          },
+          {
+            "name": "limit",
+            "type": "number",
+            "required": false,
+            "description": "Maximum number of results to return."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": { "context": { "slot": 100 }, "value": { "items": [], "cursor": null } }
+      },
+      "errors": []
+    },
+    {
+      "method": "getCompressionSignaturesForAccount",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/zk-compression/getcompressionsignaturesforaccount",
+      "category": "zk-compression",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "hash",
+            "type": "string",
+            "required": true,
+            "description": "A 32-byte hash represented as a base58 string."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": { "context": { "slot": 100 }, "value": { "items": [] } }
+      },
+      "errors": []
+    },
+    {
+      "method": "getCompressionSignaturesForAddress",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/zk-compression/getcompressionsignaturesforaddress",
+      "category": "zk-compression",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "address",
+            "type": "string",
+            "required": true,
+            "description": "A Solana public key represented as a base58 string."
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "required": false,
+            "description": "Pagination cursor."
+          },
+          {
+            "name": "limit",
+            "type": "number",
+            "required": false,
+            "description": "Maximum number of results to return."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": { "context": { "slot": 100 }, "value": { "items": [], "cursor": null } }
+      },
+      "errors": []
+    },
+    {
+      "method": "getCompressionSignaturesForOwner",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/zk-compression/getcompressionsignaturesforowner",
+      "category": "zk-compression",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          { "name": "owner", "type": "string", "required": true, "description": "A Solana public key represented as a base58 string." },
+          { "name": "cursor", "type": "string", "required": false, "description": "Pagination cursor." },
+          { "name": "limit", "type": "number", "required": false, "description": "Maximum number of results to return." }
+        ]
+      },
+      "response": { "kind": "json_example", "value": { "context": { "slot": 100 }, "value": { "items": [], "cursor": null } } },
+      "errors": []
+    },
+    {
+      "method": "getCompressionSignaturesForTokenOwner",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/zk-compression/getcompressionsignaturesfortokenowner",
+      "category": "zk-compression",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          { "name": "owner", "type": "string", "required": true, "description": "A Solana public key represented as a base58 string." },
+          { "name": "cursor", "type": "string", "required": false, "description": "Pagination cursor." },
+          { "name": "limit", "type": "number", "required": false, "description": "Maximum number of results to return." }
+        ]
+      },
+      "response": { "kind": "json_example", "value": { "context": { "slot": 100 }, "value": { "items": [], "cursor": null } } },
+      "errors": []
+    },
+    {
+      "method": "getIndexerHealth",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/zk-compression/getindexerhealth",
+      "category": "zk-compression",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": { "kind": "table", "fields": [] },
+      "response": { "kind": "json_example", "value": "ok" },
+      "errors": []
+    },
+    {
+      "method": "getIndexerSlot",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/zk-compression/getindexerslot",
+      "category": "zk-compression",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": { "kind": "table", "fields": [] },
+      "response": { "kind": "json_example", "value": 100 },
+      "errors": []
+    },
+    {
+      "method": "getLatestCompressionSignatures",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/zk-compression/getlatestcompressionsignatures",
+      "category": "zk-compression",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          { "name": "cursor", "type": "string", "required": false, "description": "Pagination cursor." },
+          { "name": "limit", "type": "number", "required": false, "description": "Maximum number of results to return." }
+        ]
+      },
+      "response": { "kind": "json_example", "value": { "context": { "slot": 100 }, "value": { "items": [], "cursor": null } } },
+      "errors": []
+    },
+    {
+      "method": "getLatestNonVotingSignatures",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/zk-compression/getlatestnonvotingsignatures",
+      "category": "zk-compression",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          { "name": "cursor", "type": "string", "required": false, "description": "Pagination cursor." },
+          { "name": "limit", "type": "number", "required": false, "description": "Maximum number of results to return." }
+        ]
+      },
+      "response": { "kind": "json_example", "value": { "context": { "slot": 100 }, "value": { "items": [] } } },
+      "errors": []
+    },
+    {
+      "method": "getMultipleCompressedAccountProofs",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/zk-compression/getmultiplecompressedaccountproofs",
+      "category": "zk-compression",
+      "transport": "jsonrpc",
+      "schema": "unknown",
+      "errors": []
+    },
+    {
+      "method": "getMultipleCompressedAccounts",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/zk-compression/getmultiplecompressedaccounts",
+      "category": "zk-compression",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          { "name": "addresses", "type": "json", "required": false, "description": "Array of Solana public keys for the compressed accounts to retrieve." },
+          { "name": "hashes", "type": "json", "required": false, "description": "Array of data hashes identifying the compressed Solana accounts to retrieve." }
+        ]
+      },
+      "response": { "kind": "json_example", "value": { "context": { "slot": 100 }, "value": { "items": [] } } },
+      "errors": []
+    },
+    {
+      "method": "getMultipleNewAddressProofs",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/zk-compression/getmultiplenewaddressproofs",
+      "category": "zk-compression",
+      "transport": "jsonrpc",
+      "schema": "unknown",
+      "errors": []
+    },
+    {
+      "method": "getMultipleNewAddressProofsV2",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/zk-compression/getmultiplenewaddressproofsv2",
+      "category": "zk-compression",
+      "transport": "jsonrpc",
+      "schema": "unknown",
+      "errors": []
+    },
+    {
+      "method": "getTransactionWithCompressionInfo",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/zk-compression/gettransactionwithcompressioninfo",
+      "category": "zk-compression",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          { "name": "signature", "type": "string", "required": true, "description": "A Solana transaction signature." }
+        ]
+      },
+      "response": { "kind": "json_example", "value": { "compression_info": { "closedAccounts": [], "openedAccounts": [] }, "transaction": {} } },
+      "errors": []
+    },
+    {
+      "method": "getValidityProof",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/zk-compression/getvalidityproof",
+      "category": "zk-compression",
+      "transport": "jsonrpc",
+      "jsonrpcParamsStyle": "object",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          { "name": "hashes", "type": "json", "required": false, "description": "Array of cryptographic hashes for Solana compressed accounts to verify." },
+          { "name": "newAddressesWithTrees", "type": "json", "required": false, "description": "Array of objects with address and tree fields for verification." }
+        ]
+      },
+      "response": { "kind": "json_example", "value": { "context": { "slot": 100 }, "value": { "compressedProof": {}, "roots": [], "rootIndices": [], "leafIndices": [], "leaves": [], "merkleTrees": [] } } },
+      "errors": []
+    },
+    {
       "method": "WebSocket",
       "docsUrl": "https://www.helius.dev/docs/api-reference/websockets",
       "category": "websockets",
@@ -4727,13 +5382,13 @@
             "name": "subscriptionMethod",
             "type": "string",
             "required": true,
-            "description": "The Solana WebSocket subscription method. e.g. accountSubscribe, logsSubscribe, programSubscribe, slotSubscribe, rootSubscribe, signatureSubscribe, blockSubscribe"
+            "description": "The Solana WebSocket subscription method."
           },
           {
-            "name": "params",
+            "name": "extraParams",
             "type": "json",
             "required": false,
-            "description": "Subscription parameters as a JSON array. e.g. for accountSubscribe: [\"<pubkey>\", {\"encoding\": \"jsonParsed\"}]"
+            "description": "Additional subscription parameters as JSON. Merged with the fields above."
           }
         ]
       },

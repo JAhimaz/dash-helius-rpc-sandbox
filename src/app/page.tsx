@@ -866,7 +866,7 @@ export default function HomePage() {
 
   const exportConsoleLog = () => {
     const lines = consoleLogs.map(
-      (entry) => `> ${entry.timestamp} | ${entry.nodeName}\n${stringifyConsoleOutput(entry.output)}\n`,
+      (entry) => `${entry.timestamp} | ${entry.nodeName}\n${stringifyConsoleOutput(entry.output)}\n`,
     );
     const blob = new Blob([lines.join("\n")], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
@@ -1401,28 +1401,59 @@ export default function HomePage() {
 
       if (transport === "websocket") {
         const subscriptionMethodParam = node.params.find((p) => p.name === "subscriptionMethod");
-        const paramsParam = node.params.find((p) => p.name === "params");
 
-        const subscriptionMethod = subscriptionMethodParam
+        const rawSubscriptionMethod = subscriptionMethodParam
           ? String(resolveParamValue(subscriptionMethodParam.value, outputsByNodeId) ?? "")
           : "";
+        const subscriptionMethod = rawSubscriptionMethod === "__custom_input__" ? "" : rawSubscriptionMethod;
 
         if (!subscriptionMethod) {
           throw new Error("subscriptionMethod is required for WebSocket nodes.");
         }
 
-        let subscriptionParams: unknown[] = [];
-        if (paramsParam) {
-          const raw = resolveParamValue(paramsParam.value, outputsByNodeId);
-          if (typeof raw === "string") {
-            try {
-              subscriptionParams = JSON.parse(raw) as unknown[];
-            } catch {
-              subscriptionParams = [];
+        const skipParams = new Set(["subscriptionMethod", "extraParams"]);
+        const subscriptionParams: unknown[] = [];
+        const optionsObj: Record<string, unknown> = {};
+
+        for (const param of node.params) {
+          if (skipParams.has(param.name)) continue;
+          const resolved = resolveParamValue(param.value, outputsByNodeId);
+          if (resolved === null || resolved === undefined || resolved === "" || resolved === "__custom_input__") continue;
+
+          const WS_PRIMARY_PARAMS = new Set(["pubkey", "programId", "signature", "filter"]);
+          if (WS_PRIMARY_PARAMS.has(param.name)) {
+            let parsed = resolved;
+            if (typeof resolved === "string") {
+              try { parsed = JSON.parse(resolved); } catch { /* keep as string */ }
             }
-          } else if (Array.isArray(raw)) {
-            subscriptionParams = raw;
+            if (subscriptionParams.length === 0) {
+              subscriptionParams.push(parsed);
+            }
+          } else {
+            let parsed = resolved;
+            if (typeof resolved === "string") {
+              try { parsed = JSON.parse(resolved); } catch { /* keep as string */ }
+            }
+            optionsObj[param.name] = parsed;
           }
+        }
+
+        const extraParamsParam = node.params.find((p) => p.name === "extraParams");
+        if (extraParamsParam) {
+          const raw = resolveParamValue(extraParamsParam.value, outputsByNodeId);
+          if (raw && raw !== "" && raw !== "__custom_input__") {
+            let parsed: unknown = raw;
+            if (typeof raw === "string") {
+              try { parsed = JSON.parse(raw); } catch { /* ignore */ }
+            }
+            if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+              Object.assign(optionsObj, parsed);
+            }
+          }
+        }
+
+        if (Object.keys(optionsObj).length > 0) {
+          subscriptionParams.push(optionsObj);
         }
 
         const wsUrl = buildHeliusWebSocketUrl(apiKeyValue, network);
@@ -1751,7 +1782,9 @@ export default function HomePage() {
       if (activeExecutionAbortControllerRef.current === executionController) {
         activeExecutionAbortControllerRef.current = null;
       }
-      setIsExecuting(false);
+      if (activeWebSocketsRef.current.size === 0) {
+        setIsExecuting(false);
+      }
     }
 
     return { success: true };
@@ -1763,17 +1796,19 @@ export default function HomePage() {
 
   const stopAllActiveNodes = () => {
     const controller = activeExecutionAbortControllerRef.current;
-    if (!controller) {
-      return;
+    if (controller) {
+      controller.abort();
+      activeExecutionAbortControllerRef.current = null;
     }
 
-    controller.abort();
-    for (const ws of activeWebSocketsRef.current.values()) {
+    for (const [nodeId, ws] of activeWebSocketsRef.current.entries()) {
       if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
         ws.close();
       }
+      setNodeStatus(nodeId, "idle");
     }
     activeWebSocketsRef.current.clear();
+    setIsExecuting(false);
     setStatusMessage("Execution stopped.");
   };
 
@@ -1934,7 +1969,7 @@ export default function HomePage() {
                 className="h-8 w-8 p-0"
                 variant="destructive"
                 onClick={stopAllActiveNodes}
-                disabled={!isExecuting}
+                disabled={!isExecuting && activeWebSocketsRef.current.size === 0}
                 aria-label="Stop all active nodes"
               >
                 <Square className="h-3.5 w-3.5" />
@@ -2186,7 +2221,6 @@ export default function HomePage() {
                     consoleLogs.map((entry, index) => (
                       <div key={`${entry.timestamp}-${index}`} className="mb-3">
                         <p className="text-foreground/50">
-                          <span className="text-foreground/35">&gt;</span>{" "}
                           <span className="text-foreground/60">{entry.timestamp}</span>
                           {" | "}
                           <span className="font-semibold text-primary">{entry.nodeName}</span>
