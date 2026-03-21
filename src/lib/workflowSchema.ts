@@ -8,7 +8,7 @@ export const paramValueSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("ref"),
     nodeId: z.string().min(1, "Reference node is required"),
-    path: z.string().min(1, "Reference path is required"),
+    path: z.string(),
   }),
 ]);
 
