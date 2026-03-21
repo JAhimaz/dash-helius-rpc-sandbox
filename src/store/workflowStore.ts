@@ -182,16 +182,21 @@ function normalizeNodePosition(position: Partial<NodePosition> | undefined, fall
   };
 }
 
+function getNodeRefIds(node: WorkflowNode): string[] {
+  const refs: string[] = [];
+  for (const param of node.params) {
+    if (param.value.type === "ref") {
+      refs.push(param.value.nodeId);
+    }
+  }
+  return refs;
+}
+
 function buildReferenceAdjacency(nodes: Record<string, WorkflowNode>): Map<string, Set<string>> {
   const adjacency = new Map<string, Set<string>>();
 
   for (const node of Object.values(nodes)) {
-    for (const param of node.params) {
-      if (param.value.type !== "ref") {
-        continue;
-      }
-
-      const sourceNodeId = param.value.nodeId;
+    for (const sourceNodeId of getNodeRefIds(node)) {
       const targets = adjacency.get(sourceNodeId) ?? new Set<string>();
       targets.add(node.id);
       adjacency.set(sourceNodeId, targets);

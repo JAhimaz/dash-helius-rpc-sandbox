@@ -358,8 +358,14 @@ export function NodeGraphCanvas({
               }
             }
 
-            const dist = Math.max(70, Math.sqrt(dx * dx + dy * dy) * 0.4);
-            const pathD = `M ${startX} ${startY} C ${startX + startDirX * dist} ${startY + startDirY * dist}, ${endX + endDirX * dist} ${endY + endDirY * dist}, ${endX} ${endY}`;
+            // Single control point for a clean one-bend curve
+            const midX = (startX + endX) / 2;
+            const midY = (startY + endY) / 2;
+            // Push control point along the exit direction of the source
+            const dist = Math.max(60, Math.sqrt(dx * dx + dy * dy) * 0.35);
+            const ctrlX = startDirX !== 0 ? startX + startDirX * dist : midX;
+            const ctrlY = startDirY !== 0 ? startY + startDirY * dist : midY;
+            const pathD = `M ${startX} ${startY} Q ${ctrlX} ${ctrlY}, ${endX} ${endY}`;
             const color = EDGE_COLORS[index % EDGE_COLORS.length];
 
             return (

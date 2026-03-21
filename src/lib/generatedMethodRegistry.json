@@ -5537,6 +5537,47 @@
       "errors": []
     },
     {
+      "method": "Filter",
+      "docsUrl": "#custom/filter",
+      "category": "custom",
+      "transport": "custom",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "input",
+            "type": "any",
+            "required": true,
+            "description": "Reference to an array from a prior node."
+          },
+          {
+            "name": "path",
+            "type": "string",
+            "required": true,
+            "description": "Dot-path key to test on each element."
+          },
+          {
+            "name": "operator",
+            "type": "string",
+            "required": true,
+            "description": "Comparison operator."
+          },
+          {
+            "name": "compareTo",
+            "type": "any",
+            "required": false,
+            "description": "Value to compare against. Not needed for 'is null' / 'is not null'."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": [{ "filtered": "element" }]
+      },
+      "errors": []
+    },
+    {
       "method": "requestAirdrop",
       "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/requestairdrop",
       "schema": "known",

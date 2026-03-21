@@ -4,7 +4,9 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   BotMessageSquare,
   BookOpen,
+  Check,
   ChevronDown,
+  Copy,
   KeyRound,
   PanelRightClose,
   Play,
@@ -505,6 +507,9 @@ function getListReference(
   node: WorkflowNode,
   nodes: Record<string, WorkflowNode>,
 ): { paramName: string; listNodeId: string; path: string } | null {
+  // Filter receives the full array and handles it internally
+  if (node.method === "Filter") return null;
+
   for (const param of node.params) {
     if (param.value.type === "ref") {
       const refNode = nodes[param.value.nodeId];
@@ -521,8 +526,18 @@ function getListReference(
   return null;
 }
 
+function getAllReferencedNodeIds(node: WorkflowNode): string[] {
+  const refs: string[] = [];
+  for (const param of node.params) {
+    if (param.value.type === "ref") {
+      refs.push(param.value.nodeId);
+    }
+  }
+  return refs;
+}
+
 function referencesAnyNode(node: WorkflowNode, nodeIds: Set<string>): boolean {
-  return node.params.some((param) => param.value.type === "ref" && nodeIds.has(param.value.nodeId));
+  return getAllReferencedNodeIds(node).some((id) => nodeIds.has(id));
 }
 
 function buildReferenceAdjacency(
@@ -538,12 +553,7 @@ function buildReferenceAdjacency(
       continue;
     }
 
-    for (const param of node.params) {
-      if (param.value.type !== "ref") {
-        continue;
-      }
-
-      const sourceNodeId = param.value.nodeId;
+    for (const sourceNodeId of getAllReferencedNodeIds(node)) {
       if (!nodeIdSet.has(sourceNodeId)) {
         continue;
       }
@@ -675,9 +685,9 @@ function groupByExecutionLevel(
     if (!node) return 0;
 
     let maxParentDepth = -1;
-    for (const param of node.params) {
-      if (param.value.type === "ref" && nodeIdSet.has(param.value.nodeId)) {
-        maxParentDepth = Math.max(maxParentDepth, getDepth(param.value.nodeId, visited));
+    for (const refId of getAllReferencedNodeIds(node)) {
+      if (nodeIdSet.has(refId)) {
+        maxParentDepth = Math.max(maxParentDepth, getDepth(refId, visited));
       }
     }
 
@@ -978,9 +988,9 @@ export default function HomePage() {
       if (!node) { depths[nodeId] = 1; return 1; }
 
       let maxParentDepth = 0;
-      for (const param of node.params) {
-        if (param.value.type === "ref" && nodeIdSet.has(param.value.nodeId)) {
-          maxParentDepth = Math.max(maxParentDepth, getDepth(param.value.nodeId, visited));
+      for (const refId of getAllReferencedNodeIds(node)) {
+        if (nodeIdSet.has(refId)) {
+          maxParentDepth = Math.max(maxParentDepth, getDepth(refId, visited));
         }
       }
 
@@ -1503,6 +1513,39 @@ export default function HomePage() {
           result = Number(result.toFixed(12));
 
           output = { input: inputValue, operation, operand, result };
+        } else if (node.method === "Filter") {
+          const inputParam = node.params.find((p) => p.name === "input");
+          const pathParam = node.params.find((p) => p.name === "path");
+          const operatorParam = node.params.find((p) => p.name === "operator");
+          const compareToParam = node.params.find((p) => p.name === "compareTo");
+
+          const inputVal = inputParam ? resolveParamValue(inputParam.value, outputsByNodeId) : null;
+          const path = String(pathParam?.value.type === "literal" ? pathParam.value.value ?? "" : "");
+          const operator = String(operatorParam ? resolveParamValue(operatorParam.value, outputsByNodeId) : "==");
+          const compareVal = compareToParam ? resolveParamValue(compareToParam.value, outputsByNodeId) : null;
+
+          if (!Array.isArray(inputVal)) {
+            output = [];
+          } else {
+            output = inputVal.filter((item) => {
+              const testVal = path ? getByPath(item, path) : item;
+              const valStr = testVal === null || testVal === undefined ? "" : String(testVal).trim();
+              const cmpStr = compareVal === null || compareVal === undefined ? "" : String(compareVal).trim();
+              switch (operator) {
+                case ">": return Number(testVal) > Number(compareVal);
+                case "<": return Number(testVal) < Number(compareVal);
+                case ">=": return Number(testVal) >= Number(compareVal);
+                case "<=": return Number(testVal) <= Number(compareVal);
+                case "!=": return valStr !== cmpStr;
+                case "==": return valStr === cmpStr;
+                case "contains": return JSON.stringify(testVal).includes(String(compareVal ?? ""));
+                case "not contains": return !JSON.stringify(testVal).includes(String(compareVal ?? ""));
+                case "is null": return testVal === null || testVal === undefined;
+                case "is not null": return testVal !== null && testVal !== undefined;
+                default: return false;
+              }
+            });
+          }
         } else {
           output = getCustomNodeOutput(node, outputsByNodeId);
         }
@@ -1859,7 +1902,8 @@ export default function HomePage() {
             );
 
             const currentNodes = useWorkflowStore.getState().nodes;
-            const iterationDownstream = downstreamNodeIds.filter((id) => currentNodes[id]?.method !== "Arithmetic");
+            const postIterationMethods = new Set(["Arithmetic"]);
+            const iterationDownstream = downstreamNodeIds.filter((id) => !postIterationMethods.has(currentNodes[id]?.method ?? ""));
             const postIterationDownstream = downstreamNodeIds.filter((id) => currentNodes[id]?.method === "Arithmetic");
 
             const originalListOutput = outputsByNodeId.get(listRef.listNodeId);
@@ -1872,8 +1916,6 @@ export default function HomePage() {
               }
 
               if (eachIndex >= 0 && arrayPrefix) {
-                // For [each] paths: rebuild the source output with the array replaced
-                // by the single item so [] skips (non-array) and remaining path resolves
                 const cloned = JSON.parse(JSON.stringify(rawListOutput));
                 setNestedValue(cloned, arrayPrefix, listArray[i]);
                 outputsByNodeId.set(listRef.listNodeId, cloned);
@@ -1883,6 +1925,10 @@ export default function HomePage() {
 
               const result = await executeSingleNode(nodeId, outputsByNodeId, executionController.signal);
               if (!result.success) return result;
+
+              // Skip downstream if output is null (filtered)
+              const currentOutput = outputsByNodeId.get(nodeId);
+              if (currentOutput === null || currentOutput === undefined) continue;
 
               for (const downstreamNodeId of iterationDownstream) {
                 const dsResult = await executeSingleNode(downstreamNodeId, outputsByNodeId, executionController.signal);
@@ -1922,7 +1968,8 @@ export default function HomePage() {
           );
 
           const repeatNodes = useWorkflowStore.getState().nodes;
-          const repeatIterationDownstream = downstreamNodeIds.filter((id) => repeatNodes[id]?.method !== "Arithmetic");
+          const repeatPostMethods = new Set(["Arithmetic"]);
+          const repeatIterationDownstream = downstreamNodeIds.filter((id) => !repeatPostMethods.has(repeatNodes[id]?.method ?? ""));
           const repeatPostIterationDownstream = downstreamNodeIds.filter((id) => repeatNodes[id]?.method === "Arithmetic");
 
           const repeatCount = Math.max(1, Math.floor(node.repeat.count));
@@ -1939,9 +1986,12 @@ export default function HomePage() {
               const nodeResult = await executeSingleNode(nodeId, outputsByNodeId, executionController.signal);
               if (!nodeResult.success) return nodeResult;
 
-              for (const downstreamNodeId of repeatIterationDownstream) {
-                const downstreamResult = await executeSingleNode(downstreamNodeId, outputsByNodeId, executionController.signal);
-                if (!downstreamResult.success) return downstreamResult;
+              const repeatCurrentOutput = outputsByNodeId.get(nodeId);
+              if (repeatCurrentOutput !== null && repeatCurrentOutput !== undefined) {
+                for (const downstreamNodeId of repeatIterationDownstream) {
+                  const downstreamResult = await executeSingleNode(downstreamNodeId, outputsByNodeId, executionController.signal);
+                  if (!downstreamResult.success) return downstreamResult;
+                }
               }
 
               globalIteration += 1;
@@ -2437,9 +2487,32 @@ export default function HomePage() {
                           <span className="text-foreground/60">{entry.timestamp}</span>
                           <span className="font-semibold text-primary">{entry.nodeName}</span>
                         </summary>
-                        <pre className="mt-1 mb-2 ml-[18px] whitespace-pre-wrap break-all rounded-md border border-border/50 bg-black/30 p-2.5 text-foreground/80">
-                          {stringifyConsoleOutput(entry.output)}
-                        </pre>
+                        <div className="relative mt-1 mb-2 ml-[18px]">
+                          <button
+                            type="button"
+                            className="absolute right-2 top-2 rounded-md border border-border/50 bg-black/40 p-1 text-foreground/40 hover:text-foreground/80 transition-colors"
+                            aria-label="Copy output"
+                            onClick={(event) => {
+                              const text = stringifyConsoleOutput(entry.output);
+                              navigator.clipboard.writeText(text);
+                              const btn = event.currentTarget;
+                              const icon = btn.querySelector("[data-copy-icon]") as HTMLElement | null;
+                              const check = btn.querySelector("[data-check-icon]") as HTMLElement | null;
+                              if (icon) icon.style.display = "none";
+                              if (check) check.style.display = "block";
+                              setTimeout(() => {
+                                if (icon) icon.style.display = "block";
+                                if (check) check.style.display = "none";
+                              }, 1500);
+                            }}
+                          >
+                            <Copy data-copy-icon className="h-3 w-3" />
+                            <Check data-check-icon className="h-3 w-3 text-green-400" style={{ display: "none" }} />
+                          </button>
+                          <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-md border border-border/50 bg-black/30 p-2.5 pr-8 text-foreground/80">
+                            {stringifyConsoleOutput(entry.output)}
+                          </pre>
+                        </div>
                       </details>
                     ))
                   )}

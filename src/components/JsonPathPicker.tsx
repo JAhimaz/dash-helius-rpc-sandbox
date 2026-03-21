@@ -180,6 +180,13 @@ function PathNode({
               <li className="px-2 pt-1.5 pb-0.5" style={{ paddingLeft: `${(entry.indent + 1) * 16 + 20}px` }}>
                 <span className="text-[10px] font-medium uppercase tracking-wider text-foreground/30">Each item</span>
               </li>
+              <PathNode
+                key={`${entry.path}[]`}
+                entry={{ path: `${entry.path}[]`, label: "(full object)", indent: entry.indent + 1, isArray: false }}
+                selectedPath={selectedPath}
+                onSelect={onSelect}
+                isEachChild
+              />
               {eachChildren.map((child) => (
                 <PathNode
                   key={child.path}
@@ -283,6 +290,23 @@ export function JsonPathPicker({
           <p className="p-3 text-center text-xs text-foreground/45">No paths match.</p>
         ) : (
           <ul>
+            <li>
+              <div className="flex items-center">
+                <span className="w-5 shrink-0" />
+                <button
+                  type="button"
+                  className={cn(
+                    "flex min-w-0 flex-1 items-center gap-2 rounded px-2 py-1 text-left text-xs transition-colors",
+                    selectedPath === ""
+                      ? "bg-primary text-primary-foreground"
+                      : "text-foreground/80 hover:bg-foreground/10",
+                  )}
+                  onClick={() => handleSelect("")}
+                >
+                  <span className="truncate font-mono italic">(entire output)</span>
+                </button>
+              </div>
+            </li>
             {filteredTree.map((entry) => (
               <PathNode
                 key={entry.path}
@@ -295,11 +319,10 @@ export function JsonPathPicker({
         )}
       </div>
 
-      {selectedNodeId && selectedPath ? (
+      {selectedNodeId && selectedPath !== undefined ? (
         <div className="rounded border border-primary/25 bg-primary/10 px-2.5 py-1.5 text-xs text-primary">
           {sourceNodes.find((node) => node.id === selectedNodeId)?.name ?? "Node"}
-          {" -> "}
-          {formatPathForDisplay(selectedPath)}
+          {selectedPath ? ` -> ${formatPathForDisplay(selectedPath)}` : " -> (entire output)"}
         </div>
       ) : null}
     </div>

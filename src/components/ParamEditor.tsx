@@ -5,6 +5,7 @@ import { Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { JsonPathPicker } from "@/components/JsonPathPicker";
+import { getByPath } from "@/lib/path";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -207,6 +208,129 @@ export function ParamEditor({
           placeholder='{"id":"assetMintAddress"}'
         />
         <p className="text-xs text-foreground/65">Unknown schema: enter params as valid JSON (object or array).</p>
+      </div>
+    );
+  }
+
+  if (methodEntry?.method === "Filter") {
+    const FILTER_OPERATORS = [">", "<", ">=", "<=", "!=", "==", "contains", "not contains", "is null", "is not null"];
+
+    const inputParam = node.params.find((p) => p.name === "input") ?? {
+      name: "input",
+      value: { type: "ref", nodeId: sourceNodes[0]?.id ?? "", path: "" } as ParamValue,
+    };
+    const pathParam = node.params.find((p) => p.name === "path");
+    const operatorParam = node.params.find((p) => p.name === "operator");
+    const compareToParam = node.params.find((p) => p.name === "compareTo");
+
+    const pathValue = pathParam?.value.type === "literal" && typeof pathParam.value.value === "string" ? pathParam.value.value : "";
+    const operatorValue = operatorParam?.value.type === "literal" && typeof operatorParam.value.value === "string" ? operatorParam.value.value : "";
+    const compareToValue = compareToParam?.value.type === "literal" ? compareToParam.value.value : null;
+    const hideCompareTo = operatorValue === "is null" || operatorValue === "is not null";
+
+    // Get the array output from the selected source node to extract keys
+    const inputRef = inputParam.value.type === "ref" ? inputParam.value : null;
+    const selectedNodeId = inputRef?.nodeId ?? sourceNodes[0]?.id ?? "";
+    const selectedSourceNode = sourceNodes.find((n) => n.id === selectedNodeId);
+    const sourceOutput = selectedSourceNode?.output;
+
+    // Filter always takes the full output as its array
+    const resolvedArray = sourceOutput;
+    const sampleItem = Array.isArray(resolvedArray) && resolvedArray.length > 0 ? resolvedArray[0] : null;
+
+    // Extract dot-paths from the sample item (one level deep for simplicity)
+    const availableKeys = useMemo(() => {
+      if (!sampleItem || typeof sampleItem !== "object" || sampleItem === null) return [];
+      const keys: string[] = [];
+      const walk = (obj: Record<string, unknown>, prefix: string) => {
+        for (const [key, val] of Object.entries(obj)) {
+          const fullKey = prefix ? `${prefix}.${key}` : key;
+          keys.push(fullKey);
+          if (val && typeof val === "object" && !Array.isArray(val)) {
+            walk(val as Record<string, unknown>, fullKey);
+          }
+        }
+      };
+      walk(sampleItem as Record<string, unknown>, "");
+      return keys;
+    }, [sampleItem]);
+
+    return (
+      <div className="space-y-3">
+        {/* Source array (ref only — just pick the node) */}
+        <div className="space-y-2 rounded-md border border-border p-3">
+          <div>
+            <p className="text-sm font-medium text-foreground">Input Array</p>
+            <p className="text-xs text-foreground/65">Select a node that outputs an array.</p>
+          </div>
+          <select
+            className="h-9 w-full rounded-md border border-border bg-background px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+            value={selectedNodeId}
+            onChange={(event) => onParamChange("input", { type: "ref", nodeId: event.target.value, path: "" })}
+          >
+            {sourceNodes.map((n) => (
+              <option key={n.id} value={n.id}>{n.name}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Key to filter on */}
+        <div className="space-y-2 rounded-md border border-border p-3">
+          <div>
+            <p className="text-sm font-medium text-foreground">Key</p>
+            <p className="text-xs text-foreground/65">Which property on each item to test.</p>
+          </div>
+          {availableKeys.length > 0 ? (
+            <select
+              className="h-9 w-full rounded-md border border-border bg-background px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+              value={pathValue}
+              onChange={(event) => onParamChange("path", { type: "literal", value: event.target.value })}
+            >
+              <option value="">Select a key</option>
+              {availableKeys.map((key) => (
+                <option key={key} value={key}>{key}</option>
+              ))}
+            </select>
+          ) : (
+            <Input
+              className="font-mono text-xs"
+              value={pathValue}
+              onChange={(event) => onParamChange("path", { type: "literal", value: event.target.value })}
+              placeholder="e.g. meta.err"
+            />
+          )}
+        </div>
+
+        {/* Operator */}
+        <div className="space-y-2 rounded-md border border-border p-3">
+          <p className="text-sm font-medium text-foreground">Operator</p>
+          <select
+            className="h-9 w-full rounded-md border border-border bg-background px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+            value={operatorValue}
+            onChange={(event) => onParamChange("operator", { type: "literal", value: event.target.value })}
+          >
+            <option value="">Select operator</option>
+            {FILTER_OPERATORS.map((op) => (
+              <option key={op} value={op}>{op}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Compare To */}
+        {!hideCompareTo ? (
+          <div className="space-y-2 rounded-md border border-border p-3">
+            <div>
+              <p className="text-sm font-medium text-foreground">Compare To</p>
+              <p className="text-xs text-foreground/65">Value to compare against.</p>
+            </div>
+            <LiteralTextarea
+              className="min-h-16 font-mono text-xs"
+              storeValue={compareToValue}
+              onChange={(value) => onParamChange("compareTo", { type: "literal", value })}
+              placeholder="Value (JSON or plain text)"
+            />
+          </div>
+        ) : null}
       </div>
     );
   }

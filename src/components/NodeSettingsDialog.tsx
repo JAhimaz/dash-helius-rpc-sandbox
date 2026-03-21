@@ -271,7 +271,7 @@ export function NodeSettingsDialog({
                     {node.error}
                   </div>
                 ) : null}
-                <pre className="min-h-full rounded-md border border-border bg-black/40 p-3 text-xs text-foreground">
+                <pre className="min-h-full overflow-x-auto whitespace-pre-wrap break-words rounded-md border border-border bg-black/40 p-3 text-xs text-foreground">
                   {outputText}
                 </pre>
               </div>

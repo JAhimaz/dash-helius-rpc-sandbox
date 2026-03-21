@@ -26,7 +26,7 @@ export function ImportExport({
 
   const exportWorkflow = () => {
     const payload = onExport(includeOutputs);
-    const fileName = `helius-workflow-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+    const fileName = `dash-workflow-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
 
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
       type: "application/json",
