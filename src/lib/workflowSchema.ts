@@ -42,6 +42,7 @@ export const workflowNodeExportSchema = z.object({
   params: z.array(paramBindingSchema),
   rawParamsJson: z.string(),
   repeat: nodeRepeatSchema.optional(),
+  resetOnNewRun: z.boolean().optional(),
   position: nodePositionSchema.optional(),
   output: z.unknown().optional(),
 }).strict();

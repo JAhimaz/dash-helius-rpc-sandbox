@@ -36,6 +36,7 @@ export interface WorkflowNode {
   rawParamsJson: string;
   repeat: NodeRepeat;
   position: NodePosition;
+  resetOnNewRun: boolean;
   output?: unknown;
   error?: string;
   status: NodeStatus;
@@ -57,6 +58,7 @@ interface WorkflowStore {
   setParamValue: (nodeId: string, paramName: string, value: ParamValue) => void;
   setRawParamsJson: (nodeId: string, rawParamsJson: string) => void;
   setNodeRepeat: (nodeId: string, repeat: Partial<NodeRepeat>) => void;
+  setResetOnNewRun: (nodeId: string, value: boolean) => void;
   setNodePosition: (nodeId: string, position: NodePosition) => void;
   setNodeStatus: (nodeId: string, status: NodeStatus, error?: string) => void;
   setNodeOutput: (nodeId: string, output: unknown) => void;
@@ -133,6 +135,7 @@ function buildNode(method: string, position: number, existingNodes: Record<strin
     params: defaults.params,
     rawParamsJson: defaults.rawParamsJson,
     repeat: DEFAULT_NODE_REPEAT,
+    resetOnNewRun: true,
     position: {
       x: DEFAULT_NODE_POSITION.x + column * 280,
       y: DEFAULT_NODE_POSITION.y + row * 200,
@@ -419,6 +422,15 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
       };
     });
   },
+  setResetOnNewRun: (nodeId, value) => {
+    set((state) => {
+      const node = state.nodes[nodeId];
+      if (!node) return state;
+      return {
+        nodes: { ...state.nodes, [nodeId]: { ...node, resetOnNewRun: value } },
+      };
+    });
+  },
   setNodePosition: (nodeId, position) => {
     set((state) => {
       const node = state.nodes[nodeId];
@@ -529,6 +541,7 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
           params: node.params,
           rawParamsJson: node.rawParamsJson,
           repeat: node.repeat,
+          resetOnNewRun: node.resetOnNewRun,
           position: node.position,
           ...(includeOutputs ? { output: node.output } : {}),
         })),
@@ -546,6 +559,7 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
         nodes[node.id] = {
           ...node,
           repeat: normalizeRepeat(node.repeat),
+          resetOnNewRun: node.resetOnNewRun ?? true,
           position: normalizeNodePosition(node.position, fallbackIndex),
           status: "idle",
           error: undefined,

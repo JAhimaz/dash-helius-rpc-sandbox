@@ -28,6 +28,7 @@ interface NodeSettingsDialogProps {
   onParamChange: (paramName: string, value: ParamValue) => void;
   onRawParamsChange: (raw: string) => void;
   onRepeatChange: (value: Partial<NodeRepeat>) => void;
+  onResetOnNewRunChange: (value: boolean) => void;
   listNodeName?: string;
 }
 
@@ -71,6 +72,7 @@ export function NodeSettingsDialog({
   onParamChange,
   onRawParamsChange,
   onRepeatChange,
+  onResetOnNewRunChange,
   listNodeName,
 }: NodeSettingsDialogProps) {
   const outputText =
@@ -242,6 +244,22 @@ export function NodeSettingsDialog({
               </label>
             </div>
           </div>
+          ) : null}
+
+          {node?.method === "Value Aggregator" ? (
+            <div className="rounded-md border border-border bg-background/60 p-3">
+              <label className="flex items-center gap-2 text-xs text-foreground/85">
+                <Checkbox
+                  checked={node.resetOnNewRun}
+                  onChange={(event) => onResetOnNewRunChange(event.target.checked)}
+                  aria-label="Reset on new run"
+                />
+                <span>Reset on new run</span>
+              </label>
+              <p className="mt-1 pl-6 text-[11px] text-foreground/50">
+                Resets the accumulated value to the initial value at the start of each run.
+              </p>
+            </div>
           ) : null}
 
           <div className="grid gap-4 md:grid-cols-2">

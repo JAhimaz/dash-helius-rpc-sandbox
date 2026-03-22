@@ -412,8 +412,12 @@ export function NodeGraphCanvas({
               key={node.id}
               data-node-card="true"
               className={cn(
-                "absolute rounded-lg border bg-[color-mix(in_srgb,var(--surface-soft)_84%,black_16%)] shadow-[0_16px_28px_-20px_black]",
-                selectedNodeId === node.id ? "border-primary/90 ring-2 ring-primary/35" : "border-border/90",
+                "absolute rounded-lg border bg-[color-mix(in_srgb,var(--surface-soft)_84%,black_16%)] shadow-[0_16px_28px_-20px_black] transition-all duration-300",
+                node.status === "running"
+                  ? "border-warning/90 ring-2 ring-warning/40 shadow-[0_0_24px_-4px_var(--warning)]"
+                  : selectedNodeId === node.id
+                    ? "border-primary/90 ring-2 ring-primary/35"
+                    : "border-border/90",
               )}
               style={{
                 left: node.position.x,
@@ -446,7 +450,8 @@ export function NodeGraphCanvas({
               <div className="flex h-full flex-col justify-between p-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="truncate text-xs font-semibold tracking-wide text-foreground">{node.method}</p>
+                    <p className="truncate text-xs font-semibold tracking-wide text-foreground">{node.name || node.method}</p>
+                    <p className="truncate text-[11px] italic text-foreground/45">{node.method}</p>
                     <p className="text-[11px] text-foreground/65">{incomingCount} in / {outgoingCount} out</p>
                   </div>
                   <div className="text-right">

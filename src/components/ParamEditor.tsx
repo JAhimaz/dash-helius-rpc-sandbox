@@ -24,6 +24,9 @@ interface ParamEditorProps {
 const CUSTOM_LITERAL_OPTION = "__custom__";
 const CUSTOM_LITERAL_SENTINEL = "__custom_input__";
 
+/** Fields that are fixed choices and should never allow a Reference source. */
+const LITERAL_ONLY_FIELDS = new Set(["operation"]);
+
 const PREDEFINED_LITERAL_OPTIONS: Record<string, string[]> = {
   commitment: ["processed", "confirmed", "finalized"],
   encoding: ["base58", "base64", "base64+zstd", "jsonParsed", "json"],
@@ -444,6 +447,7 @@ export function ParamEditor({
           value: { type: "literal", value: null } as ParamValue,
         };
         const isBooleanField = field.type?.toLowerCase() === "boolean";
+        const isLiteralOnly = LITERAL_ONLY_FIELDS.has(field.name.trim().toLowerCase());
         const presetOptions = getPresetOptions(field.name);
         const literalValue = param.value.type === "literal" ? param.value.value : null;
         const isPresetLiteral =
@@ -473,34 +477,36 @@ export function ParamEditor({
                 </p>
               </div>
 
-              <select
-                className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-                value={param.value.type}
-                onChange={(event) => {
-                  if (event.target.value === "ref") {
-                    if (sourceNodes.length === 0) {
+              {isLiteralOnly ? null : (
+                <select
+                  className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                  value={param.value.type}
+                  onChange={(event) => {
+                    if (event.target.value === "ref") {
+                      if (sourceNodes.length === 0) {
+                        return;
+                      }
+                      const sourceNode = sourceNodes[0];
+                      onParamChange(field.name, {
+                        type: "ref",
+                        nodeId: sourceNode?.id ?? "",
+                        path: "",
+                      });
                       return;
                     }
-                    const sourceNode = sourceNodes[0];
-                    onParamChange(field.name, {
-                      type: "ref",
-                      nodeId: sourceNode?.id ?? "",
-                      path: "",
-                    });
-                    return;
-                  }
 
-                  onParamChange(field.name, {
-                    type: "literal",
-                    value: null,
-                  });
-                }}
-              >
-                <option value="literal">Literal</option>
-                <option value="ref" disabled={sourceNodes.length === 0}>
-                  Reference
-                </option>
-              </select>
+                    onParamChange(field.name, {
+                      type: "literal",
+                      value: null,
+                    });
+                  }}
+                >
+                  <option value="literal">Literal</option>
+                  <option value="ref" disabled={sourceNodes.length === 0}>
+                    Reference
+                  </option>
+                </select>
+              )}
             </div>
 
             {param.value.type === "literal" ? (

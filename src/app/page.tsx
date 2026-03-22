@@ -482,16 +482,26 @@ function getMethodCategoryId(entry: MethodRegistryEntry): MethodCategoryId {
   return entry.category ?? "solana-rpc-apis";
 }
 
-function setNestedValue(obj: unknown, path: string, value: unknown): void {
-  const keys = path.split(".");
-  let current: unknown = obj;
+/**
+ * Build a minimal nested object so that getByPath(wrapper, originalPath)
+ * resolves to `value`.  [] tokens in the path are stripped — getByPath
+ * skips [] on non-arrays, so the navigation still works.
+ */
+function buildNestedWrapper(path: string, value: unknown): unknown {
+  const keys = path
+    .replace(/\[\]/g, "")
+    .replace(/\[(\d+)\]/g, ".$1")
+    .split(".")
+    .filter(Boolean);
+  if (keys.length === 0) return value;
+  const root: Record<string, unknown> = {};
+  let current: Record<string, unknown> = root;
   for (let i = 0; i < keys.length - 1; i += 1) {
-    if (typeof current !== "object" || current === null) return;
-    current = (current as Record<string, unknown>)[keys[i]];
+    current[keys[i]] = {};
+    current = current[keys[i]] as Record<string, unknown>;
   }
-  if (typeof current === "object" && current !== null) {
-    (current as Record<string, unknown>)[keys[keys.length - 1]] = value;
-  }
+  current[keys[keys.length - 1]] = value;
+  return root;
 }
 
 function getCustomNodeOutput(node: WorkflowNode, outputsByNodeId: Map<string, unknown>): unknown {
@@ -857,6 +867,7 @@ export default function HomePage() {
   const setParamValue = useWorkflowStore((state) => state.setParamValue);
   const setRawParamsJson = useWorkflowStore((state) => state.setRawParamsJson);
   const setNodeRepeat = useWorkflowStore((state) => state.setNodeRepeat);
+  const setResetOnNewRun = useWorkflowStore((state) => state.setResetOnNewRun);
   const setNodeStatus = useWorkflowStore((state) => state.setNodeStatus);
   const setNodeOutput = useWorkflowStore((state) => state.setNodeOutput);
   const clearOutputs = useWorkflowStore((state) => state.clearOutputs);
@@ -1840,6 +1851,14 @@ export default function HomePage() {
     setNodeCallTargets(initialCallTargets);
     setNodeCallCounts(initialCallCounts);
 
+    // Reset aggregator state for Value Aggregator nodes that have resetOnNewRun enabled
+    for (const nodeId of orderSnapshot) {
+      const node = state.nodes[nodeId];
+      if (node?.method === "Value Aggregator" && node.resetOnNewRun) {
+        aggregatorStateRef.current.delete(nodeId);
+      }
+    }
+
     const outputsByNodeId = new Map<string, unknown>();
     for (const nodeId of orderSnapshot) {
       const output = state.nodes[nodeId]?.output;
@@ -1876,13 +1895,16 @@ export default function HomePage() {
           if (listRef) {
             const rawListOutput = outputsByNodeId.get(listRef.listNodeId);
 
-            // For [each] paths, resolve the path prefix up to [] to get the array
+            // Resolve the full path — getByPath handles [] tokens by mapping
+            // over arrays recursively, which may produce nested arrays when the
+            // path crosses multiple array levels.  Flatten so we iterate the
+            // individual leaf values (e.g. each accountKey string, not an array
+            // of arrays).
             let listArray: unknown[];
-            const eachIndex = listRef.path.indexOf("[]");
-            if (eachIndex > 0) {
-              const arrayPath = listRef.path.slice(0, eachIndex).replace(/\.$/, "");
-              const resolved = getByPath(rawListOutput, arrayPath);
-              listArray = Array.isArray(resolved) ? resolved : [];
+            const hasEach = listRef.path.includes("[]");
+            if (hasEach) {
+              const resolved = getByPath(rawListOutput, listRef.path);
+              listArray = Array.isArray(resolved) ? (resolved as unknown[]).flat(Infinity) : resolved !== undefined ? [resolved] : [];
             } else {
               listArray = Array.isArray(rawListOutput) ? rawListOutput : [];
             }
@@ -1908,17 +1930,17 @@ export default function HomePage() {
 
             const originalListOutput = outputsByNodeId.get(listRef.listNodeId);
 
-            const arrayPrefix = eachIndex > 0 ? listRef.path.slice(0, eachIndex).replace(/\.$/, "") : "";
-
             for (let i = 0; i < listArray.length; i += 1) {
               if (executionController.signal.aborted) {
                 return { success: false, canceled: true, errorMessage: "Execution stopped by user." };
               }
 
-              if (eachIndex >= 0 && arrayPrefix) {
-                const cloned = JSON.parse(JSON.stringify(rawListOutput));
-                setNestedValue(cloned, arrayPrefix, listArray[i]);
-                outputsByNodeId.set(listRef.listNodeId, cloned);
+              if (hasEach) {
+                // Build a minimal wrapper object so that
+                // getByPath(wrapper, originalPath) resolves to the single item.
+                // getByPath skips [] on non-arrays, so the navigation still works.
+                const wrapper = buildNestedWrapper(listRef.path, listArray[i]);
+                outputsByNodeId.set(listRef.listNodeId, wrapper);
               } else {
                 outputsByNodeId.set(listRef.listNodeId, listArray[i]);
               }
@@ -2775,6 +2797,10 @@ export default function HomePage() {
             return;
           }
           setNodeRepeat(editingNode.id, value);
+        }}
+        onResetOnNewRunChange={(value) => {
+          if (!editingNode) return;
+          setResetOnNewRun(editingNode.id, value);
         }}
         listNodeName={(() => {
           if (!editingNode) return undefined;
