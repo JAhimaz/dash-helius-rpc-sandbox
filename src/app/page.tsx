@@ -9,20 +9,14 @@ import {
   Copy,
   KeyRound,
   PanelRightClose,
-  Play,
   Plus,
   Download,
-  RotateCcw,
   Send,
   Search,
-  Square,
   SquareChevronRight,
-  StepForward,
   ToggleLeft,
   ToggleRight,
 } from "lucide-react";
-
-import { ImportExport } from "@/components/ImportExport";
 import { NodeGraphCanvas, type NodeGraphConnection } from "@/components/NodeGraphCanvas";
 import { NodeSettingsDialog } from "@/components/NodeSettingsDialog";
 import { Button } from "@/components/ui/button";
@@ -1034,7 +1028,7 @@ export default function HomePage() {
         }
 
         connections.push({
-          id: `${param.value.nodeId}-${node.id}-${param.name}-${param.value.path}-${connections.length}`,
+          id: `${param.value.nodeId}-${node.id}-${param.name}-${param.value.path}`,
           fromNodeId: param.value.nodeId,
           toNodeId: node.id,
           paramName: param.name,
@@ -2235,65 +2229,6 @@ export default function HomePage() {
               />
             </div>
 
-            <QuickTooltip content="Execute all">
-              <Button
-                size="sm"
-                className="h-8 w-8 p-0"
-                onClick={() => void executeAll()}
-                disabled={isExecuting || order.length === 0}
-                aria-label="Execute all"
-              >
-                <Play className="h-3.5 w-3.5" />
-              </Button>
-            </QuickTooltip>
-            <QuickTooltip content="Stop all active nodes">
-              <Button
-                size="sm"
-                className="h-8 w-8 p-0"
-                variant="destructive"
-                onClick={stopAllActiveNodes}
-                disabled={!isExecuting && activeWebSocketsRef.current.size === 0}
-                aria-label="Stop all active nodes"
-              >
-                <Square className="h-3.5 w-3.5" />
-              </Button>
-            </QuickTooltip>
-            <QuickTooltip content="Execute from current node">
-              <Button
-                size="sm"
-                className="h-8 w-8 p-0"
-                variant="outline"
-                onClick={() => void executeFromSelected()}
-                disabled={isExecuting || order.length === 0}
-                aria-label="Execute from current node"
-              >
-                <StepForward className="h-3.5 w-3.5" />
-              </Button>
-            </QuickTooltip>
-            <QuickTooltip content="Reset">
-              <Button
-                size="sm"
-                className="h-8 w-8 p-0"
-                variant="secondary"
-                onClick={() => {
-                  clearOutputs();
-                  clearExecutionCallStats();
-                  clearConsole();
-                  aggregatorStateRef.current.clear();
-                }}
-                disabled={isExecuting || order.length === 0}
-                aria-label="Reset"
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-              </Button>
-            </QuickTooltip>
-
-            <ImportExport
-              includeOutputs={includeOutputsOnExport}
-              onIncludeOutputsChange={setIncludeOutputsOnExport}
-              onExport={(includeOutputs) => exportWorkflow(includeOutputs)}
-              onImport={importWorkflow}
-            />
           </div>
 
           {statusMessage ? <p className="mt-3 text-xs text-foreground/80">{statusMessage}</p> : null}
@@ -2736,7 +2671,22 @@ export default function HomePage() {
                   setEditingNodeId(undefined);
                 }
               }}
-              onMoveNode={(nodeId, position) => setNodePosition(nodeId, position)}
+              onMoveNode={setNodePosition}
+              isExecuting={isExecuting}
+              hasActiveWebSockets={activeWebSocketsRef.current.size > 0}
+              onExecuteAll={() => void executeAll()}
+              onStop={stopAllActiveNodes}
+              onExecuteFromSelected={() => void executeFromSelected()}
+              onReset={() => {
+                clearOutputs();
+                clearExecutionCallStats();
+                clearConsole();
+                aggregatorStateRef.current.clear();
+              }}
+              includeOutputsOnExport={includeOutputsOnExport}
+              onIncludeOutputsChange={setIncludeOutputsOnExport}
+              onExport={(includeOutputs) => exportWorkflow(includeOutputs)}
+              onImport={importWorkflow}
             />
           )}
         </section>

@@ -1,11 +1,30 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Minus, Plus, Settings, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ReactFlow,
+  Background,
+  type Node,
+  type Edge,
+  type NodeTypes,
+  type NodeProps,
+  type OnNodesChange,
+  type OnNodeDrag,
+  Handle,
+  Position,
+  ReactFlowProvider,
+  useReactFlow,
+  applyNodeChanges,
+  BackgroundVariant,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import { Maximize, Minus, Play, Plus, RotateCcw, Settings, Square, StepForward, Trash2 } from "lucide-react";
 
+import { ImportExport } from "@/components/ImportExport";
 import { Button } from "@/components/ui/button";
 import { QuickTooltip } from "@/components/ui/quick-tooltip";
 import type { WorkflowNode } from "@/store/workflowStore";
+import type { WorkflowExport } from "@/lib/workflowSchema";
 import { cn } from "@/lib/utils";
 
 const NODE_WIDTH = 330;
@@ -31,226 +50,211 @@ interface NodeGraphCanvasProps {
   onOpenNodeSettings: (nodeId: string) => void;
   onDeleteNode: (nodeId: string) => void;
   onMoveNode: (nodeId: string, position: { x: number; y: number }) => void;
+  // Toolbar
+  isExecuting: boolean;
+  hasActiveWebSockets: boolean;
+  onExecuteAll: () => void;
+  onStop: () => void;
+  onExecuteFromSelected: () => void;
+  onReset: () => void;
+  includeOutputsOnExport: boolean;
+  onIncludeOutputsChange: (next: boolean) => void;
+  onExport: (includeOutputs: boolean) => WorkflowExport;
+  onImport: (payload: WorkflowExport) => void;
 }
 
-interface ViewportState {
-  x: number;
-  y: number;
-  zoom: number;
+// ── Custom node data ──
+
+interface WorkflowNodeData {
+  label: string;
+  method: string;
+  status: WorkflowNode["status"];
+  output: unknown;
+  callCount: number;
+  callTarget: number | null;
+  executionOrder: number | null;
+  incomingCount: number;
+  outgoingCount: number;
+  isSelected: boolean;
+  onOpenSettings: () => void;
+  onDelete: () => void;
+  [key: string]: unknown;
 }
 
-interface NodeDragState {
-  nodeId: string;
-  startClientX: number;
-  startClientY: number;
-  startNodeX: number;
-  startNodeY: number;
-}
-
-interface CanvasPanState {
-  startClientX: number;
-  startClientY: number;
-  startViewportX: number;
-  startViewportY: number;
-}
-
-function clampZoom(value: number): number {
-  return Math.min(2.4, Math.max(0.45, value));
-}
+// ── Status dot ──
 
 function statusClass(status: WorkflowNode["status"]): string {
-  if (status === "running") {
-    return "bg-warning";
-  }
-  if (status === "success") {
-    return "bg-success";
-  }
-  if (status === "error") {
-    return "bg-error";
-  }
+  if (status === "running") return "bg-warning";
+  if (status === "success") return "bg-success";
+  if (status === "error") return "bg-error";
   return "bg-foreground/45";
 }
 
-function connectorOffset(index: number, count: number): number {
-  return (index - (count - 1) / 2) * 12;
-}
+// ── Handle style (invisible dots, just connection points) ──
 
-export function NodeGraphCanvas({
-  nodes,
-  selectedNodeId,
-  connections,
-  callCountsByNodeId,
-  callTargetsByNodeId,
-  executionOrderByNodeId,
-  onSelectNode,
-  onOpenNodeSettings,
-  onDeleteNode,
-  onMoveNode,
-}: NodeGraphCanvasProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const dragStateRef = useRef<NodeDragState | null>(null);
-  const panStateRef = useRef<CanvasPanState | null>(null);
-  const [viewport, setViewport] = useState<ViewportState>({ x: 120, y: 90, zoom: 1 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [isPanning, setIsPanning] = useState(false);
-  const [hoveredEdgeTooltip, setHoveredEdgeTooltip] = useState<{
-    x: number;
-    y: number;
-    text: string;
-  } | null>(null);
+const handleStyle = { background: "transparent", width: 8, height: 8, border: "none" };
 
-  const nodeById = useMemo(
-    () => new globalThis.Map<string, WorkflowNode>(nodes.map((node) => [node.id, node])),
-    [nodes],
-  );
+// ── Custom node component ──
 
-  const outgoingByNodeId = useMemo(() => {
-    const map = new globalThis.Map<string, NodeGraphConnection[]>();
-    for (const connection of connections) {
-      const list = map.get(connection.fromNodeId) ?? [];
-      list.push(connection);
-      map.set(connection.fromNodeId, list);
-    }
-    return map;
-  }, [connections]);
-
-  const incomingByNodeId = useMemo(() => {
-    const map = new globalThis.Map<string, NodeGraphConnection[]>();
-    for (const connection of connections) {
-      const list = map.get(connection.toNodeId) ?? [];
-      list.push(connection);
-      map.set(connection.toNodeId, list);
-    }
-    return map;
-  }, [connections]);
-
-  const worldBounds = useMemo(() => {
-    const maxX = nodes.reduce((largest, node) => Math.max(largest, node.position.x + NODE_WIDTH + 260), 2200);
-    const maxY = nodes.reduce((largest, node) => Math.max(largest, node.position.y + NODE_HEIGHT + 220), 1500);
-    return {
-      width: maxX,
-      height: maxY,
-    };
-  }, [nodes]);
-
-  const zoomAt = (clientX: number, clientY: number, zoomFactor: number) => {
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) {
-      return;
-    }
-
-    setViewport((current) => {
-      const currentZoom = current.zoom;
-      const nextZoom = clampZoom(current.zoom * zoomFactor);
-      if (Math.abs(nextZoom - currentZoom) < 0.0001) {
-        return current;
-      }
-
-      const localX = clientX - rect.left;
-      const localY = clientY - rect.top;
-      const worldX = (localX - current.x) / currentZoom;
-      const worldY = (localY - current.y) / currentZoom;
-
-      return {
-        x: localX - worldX * nextZoom,
-        y: localY - worldY * nextZoom,
-        zoom: nextZoom,
-      };
-    });
-  };
-
-  useEffect(() => {
-    const handleMouseMove = (event: MouseEvent) => {
-      if (dragStateRef.current) {
-        const dragState = dragStateRef.current;
-        const deltaX = (event.clientX - dragState.startClientX) / viewport.zoom;
-        const deltaY = (event.clientY - dragState.startClientY) / viewport.zoom;
-        onMoveNode(dragState.nodeId, {
-          x: dragState.startNodeX + deltaX,
-          y: dragState.startNodeY + deltaY,
-        });
-        return;
-      }
-
-      if (panStateRef.current) {
-        const panState = panStateRef.current;
-        setViewport((current) => ({
-          ...current,
-          x: panState.startViewportX + (event.clientX - panState.startClientX),
-          y: panState.startViewportY + (event.clientY - panState.startClientY),
-        }));
-      }
-    };
-
-    const handleMouseUp = () => {
-      dragStateRef.current = null;
-      panStateRef.current = null;
-      setIsDragging(false);
-      setIsPanning(false);
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [onMoveNode, viewport.zoom]);
-
+function WorkflowNodeCard({ data }: NodeProps<Node<WorkflowNodeData>>) {
   return (
     <div
-      ref={containerRef}
       className={cn(
-        "relative h-[680px] overflow-hidden rounded-xl border border-border shadow-[0_20px_40px_-24px_var(--panel-shadow)]",
-        isPanning ? "cursor-grabbing" : isDragging ? "cursor-move" : "cursor-default",
+        "rounded-lg border bg-[color-mix(in_srgb,var(--surface-soft)_84%,black_16%)] shadow-[0_16px_28px_-20px_black] select-none",
+        data.isSelected
+          ? "border-primary/90 ring-2 ring-primary/35"
+          : "border-border/90",
       )}
-      style={{
-        backgroundColor: "#120e1d",
-        backgroundImage:
-          "linear-gradient(rgba(180,120,255,0.11) 1px, transparent 1px), linear-gradient(90deg, rgba(180,120,255,0.11) 1px, transparent 1px)",
-        backgroundSize: `${32 * viewport.zoom}px ${32 * viewport.zoom}px`,
-        backgroundPosition: `${viewport.x}px ${viewport.y}px`,
-      }}
-      onWheel={(event) => {
-        event.preventDefault();
-        const zoomFactor = event.deltaY > 0 ? 0.92 : 1.08;
-        zoomAt(event.clientX, event.clientY, zoomFactor);
-      }}
-      onMouseDown={(event) => {
-        if (event.button !== 0) {
-          return;
-        }
-
-        const target = event.target as HTMLElement;
-        if (target.closest("[data-node-card='true']") || target.closest("[data-graph-control='true']")) {
-          return;
-        }
-
-        panStateRef.current = {
-          startClientX: event.clientX,
-          startClientY: event.clientY,
-          startViewportX: viewport.x,
-          startViewportY: viewport.y,
-        };
-        setIsPanning(true);
-      }}
+      style={{ width: NODE_WIDTH, height: NODE_HEIGHT }}
     >
-      <div className="absolute left-3 top-3 z-30 flex items-center gap-2" data-graph-control="true">
-        <span className="rounded border border-border bg-black/45 px-2 py-1 text-[11px] text-foreground/80">
-          Zoom {Math.round(viewport.zoom * 100)}%
-        </span>
+      {/* Handles on all 4 sides for directional edges */}
+      <Handle type="target" position={Position.Left} id="left" style={handleStyle} />
+      <Handle type="target" position={Position.Top} id="top" style={handleStyle} />
+      <Handle type="target" position={Position.Right} id="right-in" style={handleStyle} />
+      <Handle type="target" position={Position.Bottom} id="bottom-in" style={handleStyle} />
+      <Handle type="source" position={Position.Right} id="right" style={handleStyle} />
+      <Handle type="source" position={Position.Bottom} id="bottom" style={handleStyle} />
+      <Handle type="source" position={Position.Left} id="left-out" style={handleStyle} />
+      <Handle type="source" position={Position.Top} id="top-out" style={handleStyle} />
+
+      <div className="flex h-full flex-col justify-between p-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="truncate text-xs font-semibold tracking-wide text-foreground">
+              {data.label}
+            </p>
+            <p className="truncate text-[11px] italic text-foreground/45">{data.method}</p>
+            <p className="text-[11px] text-foreground/65">
+              {data.incomingCount} in / {data.outgoingCount} out
+            </p>
+          </div>
+          <div className="text-right">
+            <span className="rounded border border-border/70 bg-black/35 px-2 py-0.5 font-mono text-[11px] text-foreground/80">
+              {data.callCount} / {data.callTarget === null ? "-" : data.callTarget}
+            </span>
+            <p className="mt-1 text-[11px] text-foreground/50">
+              #{data.executionOrder ?? "-"}
+            </p>
+          </div>
+        </div>
+
+        {data.method === "Value Aggregator" &&
+        data.output != null &&
+        typeof data.output === "object" &&
+        "accumulated" in (data.output as Record<string, unknown>) ? (
+          <p className="truncate text-center font-mono text-sm font-semibold text-primary">
+            {String((data.output as { accumulated: unknown }).accumulated)}
+          </p>
+        ) : data.method === "Arithmetic" &&
+          data.output != null &&
+          typeof data.output === "object" &&
+          "result" in (data.output as Record<string, unknown>) ? (
+          <p className="truncate text-center font-mono text-sm font-semibold text-primary">
+            {String((data.output as { result: unknown }).result)}
+          </p>
+        ) : data.method === "List" ? (
+          <p className="truncate text-center font-mono text-[11px] text-foreground/50">
+            {Array.isArray(data.output) ? `${data.output.length} items` : "0 items"}
+          </p>
+        ) : null}
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                "h-2.5 w-2.5 rounded-full",
+                data.status === "running" && data.method === "WebSocket"
+                  ? "bg-success"
+                  : statusClass(data.status),
+              )}
+            />
+            <span className="text-[11px] uppercase tracking-wide text-foreground/70">
+              {data.status === "running" && data.method === "WebSocket"
+                ? "live"
+                : data.status}
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <QuickTooltip content="Delete node">
+              <Button
+                size="sm"
+                variant="destructive"
+                className="h-7 w-7 p-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  data.onDelete();
+                }}
+                aria-label="Delete node"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </QuickTooltip>
+            <QuickTooltip content="Node settings">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 w-7 p-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  data.onOpenSettings();
+                }}
+                aria-label="Open node settings"
+              >
+                <Settings className="h-3.5 w-3.5" />
+              </Button>
+            </QuickTooltip>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const nodeTypes: NodeTypes = {
+  workflow: WorkflowNodeCard,
+};
+
+// ── Toolbar controls ──
+
+interface CanvasControlsProps {
+  isExecuting: boolean;
+  hasActiveWebSockets: boolean;
+  hasNodes: boolean;
+  onExecuteAll: () => void;
+  onStop: () => void;
+  onExecuteFromSelected: () => void;
+  onReset: () => void;
+  includeOutputsOnExport: boolean;
+  onIncludeOutputsChange: (next: boolean) => void;
+  onExport: (includeOutputs: boolean) => WorkflowExport;
+  onImport: (payload: WorkflowExport) => void;
+}
+
+function CanvasControls({
+  isExecuting,
+  hasActiveWebSockets,
+  hasNodes,
+  onExecuteAll,
+  onStop,
+  onExecuteFromSelected,
+  onReset,
+  includeOutputsOnExport,
+  onIncludeOutputsChange,
+  onExport,
+  onImport,
+}: CanvasControlsProps) {
+  const { zoomIn, zoomOut, fitView } = useReactFlow();
+
+  return (
+    <>
+      {/* View controls — left */}
+      <div className="absolute left-3 top-3 z-30 flex items-center gap-1.5">
         <QuickTooltip content="Zoom in">
           <Button
             size="sm"
             variant="outline"
             className="h-8 w-8 p-0"
-            onClick={() => {
-              const rect = containerRef.current?.getBoundingClientRect();
-              if (!rect) {
-                return;
-              }
-              zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, 1.1);
-            }}
+            onClick={() => zoomIn({ duration: 200 })}
             aria-label="Zoom in"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -261,278 +265,296 @@ export function NodeGraphCanvas({
             size="sm"
             variant="outline"
             className="h-8 w-8 p-0"
-            onClick={() => {
-              const rect = containerRef.current?.getBoundingClientRect();
-              if (!rect) {
-                return;
-              }
-              zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, 0.9);
-            }}
+            onClick={() => zoomOut({ duration: 200 })}
             aria-label="Zoom out"
           >
             <Minus className="h-3.5 w-3.5" />
           </Button>
         </QuickTooltip>
+        <QuickTooltip content="Fit to screen">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 w-8 p-0"
+            onClick={() => fitView({ padding: 0.2, duration: 300 })}
+            aria-label="Fit to screen"
+          >
+            <Maximize className="h-3.5 w-3.5" />
+          </Button>
+        </QuickTooltip>
       </div>
 
-      <div
-        className="absolute inset-0"
-        style={{
-          transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
-          transformOrigin: "0 0",
-        }}
+      {/* Execution & import/export — right */}
+      <div className="absolute right-3 top-3 z-30 flex items-center gap-1.5">
+        <QuickTooltip content="Execute all">
+          <Button
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={onExecuteAll}
+            disabled={isExecuting || !hasNodes}
+            aria-label="Execute all"
+          >
+            <Play className="h-3.5 w-3.5" />
+          </Button>
+        </QuickTooltip>
+        <QuickTooltip content="Stop">
+          <Button
+            size="sm"
+            className="h-8 w-8 p-0"
+            variant="destructive"
+            onClick={onStop}
+            disabled={!isExecuting && !hasActiveWebSockets}
+            aria-label="Stop"
+          >
+            <Square className="h-3.5 w-3.5" />
+          </Button>
+        </QuickTooltip>
+        <QuickTooltip content="Execute from current node">
+          <Button
+            size="sm"
+            className="h-8 w-8 p-0"
+            variant="outline"
+            onClick={onExecuteFromSelected}
+            disabled={isExecuting || !hasNodes}
+            aria-label="Execute from current node"
+          >
+            <StepForward className="h-3.5 w-3.5" />
+          </Button>
+        </QuickTooltip>
+        <QuickTooltip content="Reset">
+          <Button
+            size="sm"
+            className="h-8 w-8 p-0"
+            variant="secondary"
+            onClick={onReset}
+            disabled={isExecuting || !hasNodes}
+            aria-label="Reset"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+          </Button>
+        </QuickTooltip>
+
+        <div className="mx-1 h-5 w-px bg-border/50" />
+
+        <ImportExport
+          includeOutputs={includeOutputsOnExport}
+          onIncludeOutputsChange={onIncludeOutputsChange}
+          onExport={onExport}
+          onImport={onImport}
+        />
+      </div>
+    </>
+  );
+}
+
+// ── Pick best handle pair based on relative position of source/target ──
+
+function getHandleIds(
+  sourcePos: { x: number; y: number },
+  targetPos: { x: number; y: number },
+): { sourceHandle: string; targetHandle: string } {
+  const dx = (targetPos.x + NODE_WIDTH / 2) - (sourcePos.x + NODE_WIDTH / 2);
+  const dy = (targetPos.y + NODE_HEIGHT / 2) - (sourcePos.y + NODE_HEIGHT / 2);
+
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    // Mostly horizontal
+    if (dx >= 0) {
+      return { sourceHandle: "right", targetHandle: "left" };
+    }
+    return { sourceHandle: "left-out", targetHandle: "right-in" };
+  }
+  // Mostly vertical
+  if (dy >= 0) {
+    return { sourceHandle: "bottom", targetHandle: "top" };
+  }
+  return { sourceHandle: "top-out", targetHandle: "bottom-in" };
+}
+
+// ── Inner canvas (needs ReactFlowProvider above it) ──
+
+function NodeGraphCanvasInner({
+  nodes: workflowNodes,
+  selectedNodeId,
+  connections,
+  callCountsByNodeId,
+  callTargetsByNodeId,
+  executionOrderByNodeId,
+  onSelectNode,
+  onOpenNodeSettings,
+  onDeleteNode,
+  onMoveNode,
+  isExecuting,
+  hasActiveWebSockets,
+  onExecuteAll,
+  onStop,
+  onExecuteFromSelected,
+  onReset,
+  includeOutputsOnExport,
+  onIncludeOutputsChange,
+  onExport,
+  onImport,
+}: NodeGraphCanvasProps) {
+  // Precompute incoming/outgoing counts
+  const { incomingCounts, outgoingCounts } = useMemo(() => {
+    const inc: Record<string, number> = {};
+    const out: Record<string, number> = {};
+    for (const c of connections) {
+      inc[c.toNodeId] = (inc[c.toNodeId] ?? 0) + 1;
+      out[c.fromNodeId] = (out[c.fromNodeId] ?? 0) + 1;
+    }
+    return { incomingCounts: inc, outgoingCounts: out };
+  }, [connections]);
+
+  // Build React Flow nodes from workflow data
+  const rfNodesFromProps = useMemo<Node<WorkflowNodeData>[]>(
+    () =>
+      workflowNodes.map((node) => ({
+        id: node.id,
+        type: "workflow",
+        position: { x: node.position.x, y: node.position.y },
+        selected: node.id === selectedNodeId,
+        draggable: true,
+        data: {
+          label: node.name || node.method,
+          method: node.method,
+          status: node.status,
+          output: node.output,
+          callCount: callCountsByNodeId[node.id] ?? 0,
+          callTarget: Object.prototype.hasOwnProperty.call(callTargetsByNodeId, node.id)
+            ? callTargetsByNodeId[node.id]
+            : 0,
+          executionOrder: Object.prototype.hasOwnProperty.call(executionOrderByNodeId, node.id)
+            ? executionOrderByNodeId[node.id]
+            : null,
+          incomingCount: incomingCounts[node.id] ?? 0,
+          outgoingCount: outgoingCounts[node.id] ?? 0,
+          isSelected: node.id === selectedNodeId,
+          onOpenSettings: () => onOpenNodeSettings(node.id),
+          onDelete: () => onDeleteNode(node.id),
+        },
+      })),
+    [
+      workflowNodes,
+      selectedNodeId,
+      callCountsByNodeId,
+      callTargetsByNodeId,
+      executionOrderByNodeId,
+      incomingCounts,
+      outgoingCounts,
+      onOpenNodeSettings,
+      onDeleteNode,
+    ],
+  );
+
+  // Local controlled nodes state — React Flow mutates this during drag for smooth 60fps movement
+  const [rfNodes, setRfNodes] = useState<Node<WorkflowNodeData>[]>(rfNodesFromProps);
+
+  // Sync from props when workflow data changes (but not during drag)
+  useEffect(() => {
+    setRfNodes(rfNodesFromProps);
+  }, [rfNodesFromProps]);
+
+  // Build a position lookup from current local state (includes live drag positions)
+  const positionById = useMemo(() => {
+    const map = new Map<string, { x: number; y: number }>();
+    for (const n of rfNodes) {
+      map.set(n.id, n.position);
+    }
+    return map;
+  }, [rfNodes]);
+
+  // Map connections → React Flow edges with directional handles
+  const rfEdges = useMemo<Edge[]>(
+    () =>
+      connections.map((conn, i) => {
+        const sourcePos = positionById.get(conn.fromNodeId) ?? { x: 0, y: 0 };
+        const targetPos = positionById.get(conn.toNodeId) ?? { x: 0, y: 0 };
+        const { sourceHandle, targetHandle } = getHandleIds(sourcePos, targetPos);
+
+        return {
+          id: conn.id,
+          source: conn.fromNodeId,
+          target: conn.toNodeId,
+          sourceHandle,
+          targetHandle,
+          type: "default",
+          style: { stroke: EDGE_COLORS[i % EDGE_COLORS.length], strokeWidth: 2.3, opacity: 0.92 },
+          data: { paramName: conn.paramName, path: conn.path },
+        };
+      }),
+    [connections, positionById],
+  );
+
+  // Apply all node changes (position during drag, selection, etc.) to local state
+  const onNodesChange: OnNodesChange = useCallback(
+    (changes) => {
+      setRfNodes((nds) => applyNodeChanges(changes, nds) as Node<WorkflowNodeData>[]);
+
+      // Forward selection changes
+      for (const change of changes) {
+        if (change.type === "select" && change.selected) {
+          onSelectNode(change.id);
+        }
+      }
+    },
+    [onSelectNode],
+  );
+
+  // Commit final position to store on drag end
+  const onNodeDragStop: OnNodeDrag = useCallback(
+    (_event, node) => {
+      onMoveNode(node.id, { x: node.position.x, y: node.position.y });
+    },
+    [onMoveNode],
+  );
+
+  return (
+    <div className="h-[680px] overflow-hidden rounded-xl border border-border shadow-[0_20px_40px_-24px_var(--panel-shadow)]">
+      <ReactFlow
+        nodes={rfNodes}
+        edges={rfEdges}
+        nodeTypes={nodeTypes}
+        onNodesChange={onNodesChange}
+        onNodeDragStop={onNodeDragStop}
+        defaultViewport={{ x: 120, y: 90, zoom: 1 }}
+        minZoom={0.45}
+        maxZoom={2.4}
+        snapToGrid
+        snapGrid={[16, 16]}
+        fitView={false}
+        proOptions={{ hideAttribution: true }}
+        selectionOnDrag={false}
+        selectNodesOnDrag={false}
+        nodesDraggable
+        panOnDrag
+        zoomOnScroll
+        className="!bg-[#120e1d]"
       >
-        <svg
-          className="absolute left-0 top-0"
-          width={worldBounds.width}
-          height={worldBounds.height}
-          viewBox={`0 0 ${worldBounds.width} ${worldBounds.height}`}
-          fill="none"
-        >
-          {connections.map((connection, index) => {
-            const source = nodeById.get(connection.fromNodeId);
-            const target = nodeById.get(connection.toNodeId);
-            if (!source || !target) {
-              return null;
-            }
-
-            const outgoing = outgoingByNodeId.get(source.id) ?? [];
-            const incoming = incomingByNodeId.get(target.id) ?? [];
-            const outgoingIndex = outgoing.findIndex((candidate) => candidate.id === connection.id);
-            const incomingIndex = incoming.findIndex((candidate) => candidate.id === connection.id);
-
-            const sourceCX = source.position.x + NODE_WIDTH / 2;
-            const sourceCY = source.position.y + NODE_HEIGHT / 2;
-            const targetCX = target.position.x + NODE_WIDTH / 2;
-            const targetCY = target.position.y + NODE_HEIGHT / 2;
-            const dx = targetCX - sourceCX;
-            const dy = targetCY - sourceCY;
-
-            let startX: number;
-            let startY: number;
-            let startDirX: number;
-            let startDirY: number;
-            let endX: number;
-            let endY: number;
-            let endDirX: number;
-            let endDirY: number;
-
-            const outOff = connectorOffset(outgoingIndex, Math.max(1, outgoing.length));
-            const inOff = connectorOffset(incomingIndex, Math.max(1, incoming.length));
-
-            if (Math.abs(dx) >= Math.abs(dy)) {
-              if (dx >= 0) {
-                // target is to the right
-                startX = source.position.x + NODE_WIDTH;
-                startY = sourceCY + outOff;
-                startDirX = 1; startDirY = 0;
-                endX = target.position.x;
-                endY = targetCY + inOff;
-                endDirX = -1; endDirY = 0;
-              } else {
-                // target is to the left
-                startX = source.position.x;
-                startY = sourceCY + outOff;
-                startDirX = -1; startDirY = 0;
-                endX = target.position.x + NODE_WIDTH;
-                endY = targetCY + inOff;
-                endDirX = 1; endDirY = 0;
-              }
-            } else {
-              if (dy >= 0) {
-                // target is below
-                startX = sourceCX + outOff;
-                startY = source.position.y + NODE_HEIGHT;
-                startDirX = 0; startDirY = 1;
-                endX = targetCX + inOff;
-                endY = target.position.y;
-                endDirX = 0; endDirY = -1;
-              } else {
-                // target is above
-                startX = sourceCX + outOff;
-                startY = source.position.y;
-                startDirX = 0; startDirY = -1;
-                endX = targetCX + inOff;
-                endY = target.position.y + NODE_HEIGHT;
-                endDirX = 0; endDirY = 1;
-              }
-            }
-
-            // Single control point for a clean one-bend curve
-            const midX = (startX + endX) / 2;
-            const midY = (startY + endY) / 2;
-            // Push control point along the exit direction of the source
-            const dist = Math.max(60, Math.sqrt(dx * dx + dy * dy) * 0.35);
-            const ctrlX = startDirX !== 0 ? startX + startDirX * dist : midX;
-            const ctrlY = startDirY !== 0 ? startY + startDirY * dist : midY;
-            const pathD = `M ${startX} ${startY} Q ${ctrlX} ${ctrlY}, ${endX} ${endY}`;
-            const color = EDGE_COLORS[index % EDGE_COLORS.length];
-
-            return (
-              <g key={connection.id}>
-                <path d={pathD} stroke="transparent" strokeWidth={14} fill="none">
-                  <title>{`output.${connection.path} -> ${connection.paramName}`}</title>
-                </path>
-                <path
-                  d={pathD}
-                  stroke="transparent"
-                  strokeWidth={14}
-                  fill="none"
-                  onMouseMove={(event) => {
-                    const rect = containerRef.current?.getBoundingClientRect();
-                    if (!rect) {
-                      return;
-                    }
-
-                    setHoveredEdgeTooltip({
-                      x: event.clientX - rect.left + 12,
-                      y: event.clientY - rect.top + 12,
-                      text: `output.${connection.path} -> ${connection.paramName}`,
-                    });
-                  }}
-                  onMouseLeave={() => setHoveredEdgeTooltip(null)}
-                />
-                <path d={pathD} stroke={color} strokeWidth={2.3} fill="none" opacity={0.92} />
-              </g>
-            );
-          })}
-        </svg>
-
-        {nodes.map((node) => {
-          const hasTarget = Object.prototype.hasOwnProperty.call(callTargetsByNodeId, node.id);
-          const target = hasTarget ? callTargetsByNodeId[node.id] : 0;
-          const hasExecutionOrder = Object.prototype.hasOwnProperty.call(executionOrderByNodeId, node.id);
-          const executionOrder = hasExecutionOrder ? executionOrderByNodeId[node.id] : null;
-          const callCount = callCountsByNodeId[node.id] ?? 0;
-          const outgoingCount = outgoingByNodeId.get(node.id)?.length ?? 0;
-          const incomingCount = incomingByNodeId.get(node.id)?.length ?? 0;
-
-          return (
-            <article
-              key={node.id}
-              data-node-card="true"
-              className={cn(
-                "absolute rounded-lg border bg-[color-mix(in_srgb,var(--surface-soft)_84%,black_16%)] shadow-[0_16px_28px_-20px_black] transition-all duration-300",
-                node.status === "running"
-                  ? "border-warning/90 ring-2 ring-warning/40 shadow-[0_0_24px_-4px_var(--warning)]"
-                  : selectedNodeId === node.id
-                    ? "border-primary/90 ring-2 ring-primary/35"
-                    : "border-border/90",
-              )}
-              style={{
-                left: node.position.x,
-                top: node.position.y,
-                width: NODE_WIDTH,
-                height: NODE_HEIGHT,
-              }}
-              onMouseDown={(event) => {
-                if (event.button !== 0) {
-                  return;
-                }
-
-                const targetElement = event.target as HTMLElement;
-                if (targetElement.closest("[data-graph-control='true']")) {
-                  return;
-                }
-
-                event.stopPropagation();
-                onSelectNode(node.id);
-                dragStateRef.current = {
-                  nodeId: node.id,
-                  startClientX: event.clientX,
-                  startClientY: event.clientY,
-                  startNodeX: node.position.x,
-                  startNodeY: node.position.y,
-                };
-                setIsDragging(true);
-              }}
-            >
-              <div className="flex h-full flex-col justify-between p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-xs font-semibold tracking-wide text-foreground">{node.name || node.method}</p>
-                    <p className="truncate text-[11px] italic text-foreground/45">{node.method}</p>
-                    <p className="text-[11px] text-foreground/65">{incomingCount} in / {outgoingCount} out</p>
-                  </div>
-                  <div className="text-right">
-                    <span className="rounded border border-border/70 bg-black/35 px-2 py-0.5 font-mono text-[11px] text-foreground/80">
-                      {callCount} / {target === null ? "-" : target}
-                    </span>
-                    <p className="mt-1 text-[11px] text-foreground/50">#{executionOrder ?? "-"}</p>
-                  </div>
-                </div>
-
-                {node.method === "Value Aggregator" && node.output != null && typeof node.output === "object" && "accumulated" in (node.output as Record<string, unknown>) ? (
-                  <p className="truncate text-center font-mono text-sm font-semibold text-primary">
-                    {String((node.output as { accumulated: unknown }).accumulated)}
-                  </p>
-                ) : node.method === "Arithmetic" && node.output != null && typeof node.output === "object" && "result" in (node.output as Record<string, unknown>) ? (
-                  <p className="truncate text-center font-mono text-sm font-semibold text-primary">
-                    {String((node.output as { result: unknown }).result)}
-                  </p>
-                ) : node.method === "List" ? (
-                  <p className="truncate text-center font-mono text-[11px] text-foreground/50">
-                    {Array.isArray(node.output) ? `${node.output.length} items` : "0 items"}
-                  </p>
-                ) : null}
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className={cn("h-2.5 w-2.5 rounded-full", node.status === "running" && node.method === "WebSocket" ? "bg-success" : statusClass(node.status))} />
-                    <span className="text-[11px] uppercase tracking-wide text-foreground/70">
-                      {node.status === "running" && node.method === "WebSocket" ? "live" : node.status}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <QuickTooltip content="Delete node">
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        data-graph-control="true"
-                        className="h-7 w-7 p-0"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onDeleteNode(node.id);
-                        }}
-                        aria-label="Delete node"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </QuickTooltip>
-                    <QuickTooltip content="Node settings">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        data-graph-control="true"
-                        className="h-7 w-7 p-0"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onSelectNode(node.id);
-                          onOpenNodeSettings(node.id);
-                        }}
-                        aria-label="Open node settings"
-                      >
-                        <Settings className="h-3.5 w-3.5" />
-                      </Button>
-                    </QuickTooltip>
-                  </div>
-                </div>
-              </div>
-            </article>
-          );
-        })}
-      </div>
-      {hoveredEdgeTooltip ? (
-        <div
-          className="pointer-events-none absolute z-40 rounded-md border border-border bg-black/85 px-2 py-1 text-xs text-foreground"
-          style={{
-            left: hoveredEdgeTooltip.x,
-            top: hoveredEdgeTooltip.y,
-          }}
-        >
-          {hoveredEdgeTooltip.text}
-        </div>
-      ) : null}
+        <Background variant={BackgroundVariant.Dots} color="rgba(180,120,255,0.25)" gap={24} size={1.5} />
+        <CanvasControls
+          isExecuting={isExecuting}
+          hasActiveWebSockets={hasActiveWebSockets}
+          hasNodes={workflowNodes.length > 0}
+          onExecuteAll={onExecuteAll}
+          onStop={onStop}
+          onExecuteFromSelected={onExecuteFromSelected}
+          onReset={onReset}
+          includeOutputsOnExport={includeOutputsOnExport}
+          onIncludeOutputsChange={onIncludeOutputsChange}
+          onExport={onExport}
+          onImport={onImport}
+        />
+      </ReactFlow>
     </div>
+  );
+}
+
+// ── Exported wrapper with provider ──
+
+export function NodeGraphCanvas(props: NodeGraphCanvasProps) {
+  return (
+    <ReactFlowProvider>
+      <NodeGraphCanvasInner {...props} />
+    </ReactFlowProvider>
   );
 }
