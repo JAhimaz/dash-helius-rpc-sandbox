@@ -16,8 +16,10 @@ import {
   SquareChevronRight,
   ToggleLeft,
   ToggleRight,
+  FileDown,
 } from "lucide-react";
 import { NodeGraphCanvas, type NodeGraphConnection } from "@/components/NodeGraphCanvas";
+import { parseWorkflowImport } from "@/lib/workflowSchema";
 import { NodeSettingsDialog } from "@/components/NodeSettingsDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -876,6 +878,7 @@ export default function HomePage() {
   const [showConsole, setShowConsole] = useState(false);
   const [consoleLogs, setConsoleLogs] = useState<ConsoleLogEntry[]>([]);
   const consoleEndRef = useRef<HTMLDivElement | null>(null);
+  const emptyStateFileRef = useRef<HTMLInputElement | null>(null);
   const [isBotReplying, setIsBotReplying] = useState(false);
   const [isBotTesting, setIsBotTesting] = useState(false);
   const [botInput, setBotInput] = useState("");
@@ -2106,7 +2109,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen p-6 text-foreground">
-      <div className="mx-auto max-w-6xl space-y-6">
+      <div className="mx-auto max-w-6xl space-y-3">
         <header>
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2">
@@ -2229,98 +2232,97 @@ export default function HomePage() {
               />
             </div>
 
+            <div className="flex items-center gap-2">
+              <QuickTooltip
+                content={
+                  gatekeeperEnabled
+                    ? "Gatekeeper enabled. JSON-RPC uses https://beta.helius-rpc.com."
+                    : "Gatekeeper disabled."
+                }
+              >
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className={gatekeeperEnabled ? "h-8 px-3 border-primary text-primary" : "h-8 px-3 text-foreground/60"}
+                  onClick={() => setGatekeeperEnabled((value) => !value)}
+                  aria-label="Toggle Gatekeeper endpoint"
+                >
+                  {gatekeeperEnabled ? (
+                    <ToggleRight className="h-3.5 w-3.5 text-primary" />
+                  ) : (
+                    <ToggleLeft className="h-3.5 w-3.5 text-foreground/50" />
+                  )}
+                  (New) Gatekeeper ✨
+                </Button>
+              </QuickTooltip>
+              <QuickTooltip content={showConsole ? "Close console" : "Open console"}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className={showConsole ? "h-8 px-3 border-primary text-primary" : "h-8 px-3 text-foreground/60"}
+                  onClick={() =>
+                    setShowConsole((value) => {
+                      const next = !value;
+                      if (next) {
+                        setShowBotPanel(false);
+                        setShowMethodPicker(false);
+                      }
+                      return next;
+                    })
+                  }
+                  aria-label={showConsole ? "Close console" : "Open console"}
+                >
+                  <SquareChevronRight className="h-3.5 w-3.5" />
+                  Console
+                </Button>
+              </QuickTooltip>
+              <QuickTooltip content="Help me build">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 px-3"
+                  onClick={() =>
+                    setShowBotPanel((value) => {
+                      const next = !value;
+                      if (next) {
+                        setShowMethodPicker(false);
+                        setShowConsole(false);
+                      }
+                      return next;
+                    })
+                  }
+                  aria-label={showBotPanel ? "Close bot panel" : "Open bot panel"}
+                >
+                  <BotMessageSquare className="h-3.5 w-3.5" />
+                  Help Me Build
+                </Button>
+              </QuickTooltip>
+              <QuickTooltip content={showMethodPicker ? "Close method picker" : "Add a new node"}>
+                <Button
+                  size="sm"
+                  onClick={() =>
+                    setShowMethodPicker((value) => {
+                      const next = !value;
+                      if (next) {
+                        setShowBotPanel(false);
+                        setShowConsole(false);
+                      }
+                      return next;
+                    })
+                  }
+                  aria-label={showMethodPicker ? "Close method picker" : "Add a new node"}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add Node
+                </Button>
+              </QuickTooltip>
+            </div>
           </div>
 
           {statusMessage ? <p className="mt-3 text-xs text-foreground/80">{statusMessage}</p> : null}
         </section>
 
-        <div>
-          <div className="flex justify-end gap-2">
-            <QuickTooltip
-              content={
-                gatekeeperEnabled
-                  ? "Gatekeeper enabled. JSON-RPC uses https://beta.helius-rpc.com."
-                  : "Gatekeeper disabled."
-              }
-            >
-              <Button
-                size="sm"
-                variant="outline"
-                className={gatekeeperEnabled ? "h-8 px-3 border-primary text-primary" : "h-8 px-3 text-foreground/60"}
-                onClick={() => setGatekeeperEnabled((value) => !value)}
-                aria-label="Toggle Gatekeeper endpoint"
-              >
-                {gatekeeperEnabled ? (
-                  <ToggleRight className="h-3.5 w-3.5 text-primary" />
-                ) : (
-                  <ToggleLeft className="h-3.5 w-3.5 text-foreground/50" />
-                )}
-                (New) Gatekeeper ✨
-              </Button>
-            </QuickTooltip>
-            <QuickTooltip content={showConsole ? "Close console" : "Open console"}>
-              <Button
-                size="sm"
-                variant="outline"
-                className={showConsole ? "h-8 px-3 border-primary text-primary" : "h-8 px-3 text-foreground/60"}
-                onClick={() =>
-                  setShowConsole((value) => {
-                    const next = !value;
-                    if (next) {
-                      setShowBotPanel(false);
-                      setShowMethodPicker(false);
-                    }
-                    return next;
-                  })
-                }
-                aria-label={showConsole ? "Close console" : "Open console"}
-              >
-                <SquareChevronRight className="h-3.5 w-3.5" />
-                Console
-              </Button>
-            </QuickTooltip>
-            <QuickTooltip content="Help me build">
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 px-3"
-                onClick={() =>
-                  setShowBotPanel((value) => {
-                    const next = !value;
-                    if (next) {
-                      setShowMethodPicker(false);
-                      setShowConsole(false);
-                    }
-                    return next;
-                  })
-                }
-                aria-label={showBotPanel ? "Close bot panel" : "Open bot panel"}
-              >
-                <BotMessageSquare className="h-3.5 w-3.5" />
-                Help Me Build
-              </Button>
-            </QuickTooltip>
-            <QuickTooltip content={showMethodPicker ? "Close method picker" : "Add a new node"}>
-              <Button
-                size="sm"
-                onClick={() =>
-                  setShowMethodPicker((value) => {
-                    const next = !value;
-                    if (next) {
-                      setShowBotPanel(false);
-                      setShowConsole(false);
-                    }
-                    return next;
-                  })
-                }
-                aria-label={showMethodPicker ? "Close method picker" : "Add a new node"}
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Add Node
-              </Button>
-            </QuickTooltip>
-          </div>
-
+        <div className={showBotPanel || showConsole || showMethodPicker ? "" : "!mt-0"}>
           <div
             className={`grid transition-[grid-template-rows,opacity,margin-top] duration-300 ease-in-out ${showBotPanel ? "mt-3 grid-rows-[1fr] opacity-100" : "pointer-events-none mt-0 grid-rows-[0fr] opacity-0"}`}
             aria-hidden={!showBotPanel}
@@ -2649,8 +2651,41 @@ export default function HomePage() {
 
         <section className="space-y-3">
           {orderedNodes.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-border bg-background/40 p-8 text-center text-sm text-foreground/70">
-              Add your first RPC node to begin building the workflow.
+            <div className="flex h-[680px] flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border bg-[#120e1d] text-center">
+              <p className="text-sm text-foreground/70">Add your first RPC node to begin building the workflow.</p>
+              <div>
+                <input
+                  ref={emptyStateFileRef}
+                  hidden
+                  accept="application/json"
+                  type="file"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) {
+                      void (async () => {
+                        try {
+                          const raw = await file.text();
+                          const json = JSON.parse(raw) as unknown;
+                          const parsed = parseWorkflowImport(json);
+                          if (parsed.success) {
+                            importWorkflow(parsed.data);
+                          }
+                        } catch { /* ignore invalid files */ }
+                      })();
+                    }
+                    event.currentTarget.value = "";
+                  }}
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 px-3"
+                  onClick={() => emptyStateFileRef.current?.click()}
+                >
+                  <FileDown className="mr-1.5 h-3.5 w-3.5" />
+                  Import Workflow
+                </Button>
+              </div>
             </div>
           ) : (
             <NodeGraphCanvas
