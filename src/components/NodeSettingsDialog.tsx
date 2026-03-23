@@ -178,19 +178,16 @@ export function NodeSettingsDialog({
             </div>
           </div>
           ) : methodEntry?.transport !== "websocket" ? (
-          <div className="mb-4 rounded-md border border-border bg-background/55 p-3">
-            <div className="mb-2 flex items-center gap-2 text-xs text-foreground/85">
-              <Checkbox
-                checked={node.repeat.enabled}
-                onChange={(event) => onRepeatChange({ enabled: event.target.checked })}
-                aria-label="Enable repeat run"
-              />
-              <span>Enable repeat</span>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3 text-xs text-foreground/80">
+          <div className="mb-4 flex flex-wrap items-center gap-3 text-xs text-foreground/80">
               <label className="flex items-center gap-2">
+                <Checkbox
+                  checked={node.repeat.enabled}
+                  onChange={(event) => onRepeatChange({ enabled: event.target.checked })}
+                  aria-label="Enable repeat run"
+                />
                 <span>Repeat</span>
+              </label>
+              <label className="flex items-center gap-2">
                 <Input
                   type="number"
                   min={1}
@@ -198,14 +195,12 @@ export function NodeSettingsDialog({
                   value={node.repeat.count}
                   onChange={(event) => onRepeatChange({ count: Number(event.target.value) })}
                   disabled={!node.repeat.enabled}
-                  className="h-8 w-20 text-xs"
+                  className="h-7 w-16 text-xs"
                   aria-label="Repeat count"
                 />
-                <span>times</span>
+                <span>times every</span>
               </label>
-
               <label className="flex items-center gap-2">
-                <span>every</span>
                 <Input
                   type="number"
                   min={0}
@@ -213,22 +208,21 @@ export function NodeSettingsDialog({
                   value={node.repeat.interval}
                   onChange={(event) => onRepeatChange({ interval: Number(event.target.value) })}
                   disabled={!node.repeat.enabled}
-                  className="h-8 w-20 text-xs"
+                  className="h-7 w-16 text-xs"
                   aria-label="Repeat interval"
                 />
                 <select
                   value={node.repeat.unit}
                   onChange={(event) => onRepeatChange({ unit: event.target.value as NodeRepeat["unit"] })}
                   disabled={!node.repeat.enabled}
-                  className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                  className="h-7 rounded-md border border-border bg-background px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
                   aria-label="Repeat interval unit"
                 >
-                  <option value="milliseconds">milliseconds</option>
-                  <option value="seconds">seconds</option>
-                  <option value="minutes">minutes</option>
+                  <option value="milliseconds">ms</option>
+                  <option value="seconds">sec</option>
+                  <option value="minutes">min</option>
                 </select>
               </label>
-
               <label className="flex items-center gap-2">
                 <Input
                   type="number"
@@ -237,12 +231,11 @@ export function NodeSettingsDialog({
                   value={node.repeat.loopCount}
                   onChange={(event) => onRepeatChange({ loopCount: Number(event.target.value) })}
                   disabled={!node.repeat.enabled}
-                  className="h-8 w-20 text-xs"
+                  className="h-7 w-16 text-xs"
                   aria-label="Repeat loop count"
                 />
-                <span>times (0 for infinite)</span>
+                <span>loops (0 = infinite)</span>
               </label>
-            </div>
           </div>
           ) : null}
 
@@ -263,9 +256,9 @@ export function NodeSettingsDialog({
           ) : null}
 
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="flex h-[420px] flex-col rounded-md border border-border bg-background/60 p-3">
+            <div className="flex h-[420px] flex-col">
               <p className="text-xs font-semibold uppercase tracking-wide text-foreground/65">Input</p>
-              <div data-dialog-scroll className="mt-3 min-h-0 flex-1 overflow-auto overscroll-contain pr-1">
+              <div data-dialog-scroll className="mt-2 min-h-0 flex-1 overflow-auto overscroll-contain pr-1">
                 {methodEntry?.schema === "unknown" ? (
                   <p className="mb-3 rounded-md border border-warning/35 bg-warning/15 px-3 py-2 text-xs text-warning">
                     Schema unknown for this method. Params use raw JSON array and output is shown as raw JSON.
@@ -281,9 +274,9 @@ export function NodeSettingsDialog({
               </div>
             </div>
 
-            <div className="flex h-[420px] flex-col rounded-md border border-border bg-background/60 p-3">
+            <div className="flex h-[420px] flex-col">
               <p className="text-xs font-semibold uppercase tracking-wide text-foreground/65">Output</p>
-              <div data-dialog-scroll className="mt-3 min-h-0 flex-1 overflow-auto overscroll-contain pr-1">
+              <div data-dialog-scroll className="mt-2 min-h-0 flex-1 overflow-auto overscroll-contain pr-1">
                 {node.error ? (
                   <div className="mb-3 rounded-md border border-error/35 bg-error/15 px-3 py-2 text-xs text-error">
                     {node.error}

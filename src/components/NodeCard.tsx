@@ -142,20 +142,18 @@ export function NodeCard({
               </QuickTooltip>
               {repeatPopoverOpen ? (
                 <div
-                  className="absolute left-0 top-10 z-30 w-72 space-y-3 rounded-md border border-border bg-background/95 p-3 shadow-lg"
+                  className="absolute left-0 top-10 z-30 flex flex-wrap items-center gap-2 rounded-md border border-border bg-background/95 p-2.5 text-xs text-foreground/80 shadow-lg"
                   onClick={(event) => event.stopPropagation()}
                 >
-                  <label className="flex items-center gap-2 text-xs text-foreground/85">
+                  <label className="flex items-center gap-2">
                     <Checkbox
                       checked={node.repeat.enabled}
                       onChange={(event) => onRepeatChange({ enabled: event.target.checked })}
                       aria-label="Enable repeat run"
                     />
-                    <span>Enable repeat</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 text-xs text-foreground/80">
                     <span>Repeat</span>
+                  </label>
+                  <label className="flex items-center gap-1.5">
                     <Input
                       type="number"
                       min={1}
@@ -163,14 +161,12 @@ export function NodeCard({
                       value={node.repeat.count}
                       onChange={(event) => onRepeatChange({ count: Number(event.target.value) })}
                       disabled={!node.repeat.enabled}
-                      className="h-8 w-20 text-xs"
+                      className="h-7 w-14 text-xs"
                       aria-label="Repeat count"
                     />
-                    <span>times</span>
+                    <span>times every</span>
                   </label>
-
-                  <label className="flex items-center gap-2 text-xs text-foreground/80">
-                    <span>every</span>
+                  <label className="flex items-center gap-1.5">
                     <Input
                       type="number"
                       min={0}
@@ -178,23 +174,22 @@ export function NodeCard({
                       value={node.repeat.interval}
                       onChange={(event) => onRepeatChange({ interval: Number(event.target.value) })}
                       disabled={!node.repeat.enabled}
-                      className="h-8 w-20 text-xs"
+                      className="h-7 w-14 text-xs"
                       aria-label="Repeat interval"
                     />
                     <select
                       value={node.repeat.unit}
                       onChange={(event) => onRepeatChange({ unit: event.target.value as NodeRepeat["unit"] })}
                       disabled={!node.repeat.enabled}
-                      className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                      className="h-7 rounded-md border border-border bg-background px-1.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
                       aria-label="Repeat interval unit"
                     >
-                      <option value="milliseconds">milliseconds</option>
-                      <option value="seconds">seconds</option>
-                      <option value="minutes">minutes</option>
+                      <option value="milliseconds">ms</option>
+                      <option value="seconds">sec</option>
+                      <option value="minutes">min</option>
                     </select>
                   </label>
-
-                  <label className="flex items-center gap-2 text-xs text-foreground/80">
+                  <label className="flex items-center gap-1.5">
                     <Input
                       type="number"
                       min={0}
@@ -202,10 +197,10 @@ export function NodeCard({
                       value={node.repeat.loopCount}
                       onChange={(event) => onRepeatChange({ loopCount: Number(event.target.value) })}
                       disabled={!node.repeat.enabled}
-                      className="h-8 w-20 text-xs"
+                      className="h-7 w-14 text-xs"
                       aria-label="Repeat loop count"
                     />
-                    <span>times (0 for infinite)</span>
+                    <span>loops (0 = infinite)</span>
                   </label>
                 </div>
               ) : null}
@@ -259,9 +254,9 @@ export function NodeCard({
         <div className="overflow-hidden">
           <CardContent className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="flex h-[450px] flex-col rounded-md border border-border bg-background/60 p-3">
+              <div className="flex h-[450px] flex-col">
                 <p className="text-xs font-semibold uppercase tracking-wide text-foreground/65">Input</p>
-                <div className="mt-3 min-h-0 flex-1 overflow-auto pr-1">
+                <div className="mt-2 min-h-0 flex-1 overflow-auto pr-1">
                   {methodEntry?.schema === "unknown" ? (
                     <p className="mb-3 rounded-md border border-warning/35 bg-warning/15 px-3 py-2 text-xs text-warning">
                       Schema unknown for this method. Params use raw JSON array and output is shown as raw JSON.
@@ -277,9 +272,9 @@ export function NodeCard({
                 </div>
               </div>
 
-              <div className="flex h-[450px] flex-col rounded-md border border-border bg-background/60 p-3">
+              <div className="flex h-[450px] flex-col">
                 <p className="text-xs font-semibold uppercase tracking-wide text-foreground/65">Output</p>
-                <div className="mt-3 min-h-0 flex-1 overflow-auto pr-1">
+                <div className="mt-2 min-h-0 flex-1 overflow-auto pr-1">
                   {node.error ? (
                     <div className="mb-3 rounded-md border border-error/35 bg-error/15 px-3 py-2 text-xs text-error">
                       {node.error}

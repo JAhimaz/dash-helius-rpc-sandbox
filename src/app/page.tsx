@@ -2139,87 +2139,6 @@ export default function HomePage() {
         </header>
 
         <section className="panel-surface rounded-xl p-4">
-          <button
-            type="button"
-            className="flex w-full items-center justify-between rounded-md px-1 py-1 text-left transition-colors duration-150 cursor-pointer"
-            onClick={() => setShowInstructions((value) => !value)}
-            aria-expanded={showInstructions}
-            aria-controls="tutorial-panel"
-            aria-label={showInstructions ? "Hide tutorial instructions" : "Show tutorial instructions"}
-          >
-            <div className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5 text-primary" />
-              <h2 className="text-sm font-semibold tracking-wide text-foreground">Tutorial</h2>
-            </div>
-            <ChevronDown
-              className={`h-4 w-4 text-foreground/70 transition-transform duration-300 ${showInstructions ? "rotate-180" : ""}`}
-            />
-          </button>
-
-          <div
-            className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${showInstructions ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
-          >
-            <div className="overflow-hidden">
-              <div id="tutorial-panel" className="mt-3 grid gap-4 text-sm text-foreground/80">
-                <div className="panel-tile rounded-lg p-3">
-                  <p className="mb-2 text-xs font-semibold tracking-wide text-primary">1. Configure Access</p>
-                  <ol className="list-inside list-decimal space-y-1">
-                    <li>Paste your Helius API key in the field below this tutorial.</li>
-                    <li>Use the action icons on the right to run all nodes, run from the selected node, stop execution, or reset.</li>
-                    <li>Use the export and import controls to save your flow and load it back.</li>
-                  </ol>
-                </div>
-
-                <div className="panel-tile rounded-lg p-3">
-                  <p className="mb-2 text-xs font-semibold tracking-wide text-primary">2. Build Nodes</p>
-                  <ol className="list-inside list-decimal space-y-1">
-                    <li>Click `Add Node`, search a method, and insert it into the workflow.</li>
-                    <li>Drag nodes around the graph canvas to organize your flow visually.</li>
-                    <li>Click the gear icon on a node to open settings, outputs, and run controls.</li>
-                  </ol>
-                </div>
-
-                <div className="panel-tile rounded-lg p-3">
-                  <p className="mb-2 text-xs font-semibold tracking-wide text-primary">3. Set Parameters</p>
-                  <ol className="list-inside list-decimal space-y-1">
-                    <li>For known schemas, fill fields in the Input pane using JSON literals.</li>
-                    <li>Switch a field to `Reference` to map data from a previous node output path.</li>
-                    <li>For unknown schemas, enter raw JSON array params directly.</li>
-                  </ol>
-                </div>
-
-                <div className="panel-tile rounded-lg p-3">
-                  <p className="mb-2 text-xs font-semibold tracking-wide text-primary">4. Execute and Inspect</p>
-                  <ol className="list-inside list-decimal space-y-1">
-                    <li>Run a single node with `Run Node` or a sequence with `Run From Here` in node settings.</li>
-                    <li>Use the node settings dialog output pane to inspect responses and errors.</li>
-                    <li>Status badges show `idle`, `running`, `success`, or `error` per node.</li>
-                  </ol>
-                </div>
-
-                <div className="panel-tile rounded-lg p-3">
-                  <p className="mb-2 text-xs font-semibold tracking-wide text-primary">5. Troubleshooting</p>
-                  <ol className="list-inside list-decimal space-y-1">
-                    <li>If you get `Invalid params`, check the parameter order and type for that method.</li>
-                    <li>Optional values should be omitted when null to avoid RPC validation errors.</li>
-                    <li>If a reference path fails, run the source node first and reselect the path.</li>
-                  </ol>
-                </div>
-
-                <div className="panel-tile rounded-lg p-3">
-                  <p className="mb-2 text-xs font-semibold tracking-wide text-primary">6. Save and Share</p>
-                  <ol className="list-inside list-decimal space-y-1">
-                    <li>Export workflow JSON to checkpoint your setup before major changes.</li>
-                    <li>Import it later to restore node order, params, and optional outputs.</li>
-                    <li>Keep method names and node labels consistent for long-running flows.</li>
-                  </ol>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="panel-surface rounded-xl p-4">
           <div className="flex flex-wrap items-end gap-4">
             <div className="min-w-64 flex-1">
               <label className="mb-2 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-foreground/65"><KeyRound className="mr-1 h-3 w-3 text-primary" />Helius API Key</label>
@@ -2266,6 +2185,7 @@ export default function HomePage() {
                       if (next) {
                         setShowBotPanel(false);
                         setShowMethodPicker(false);
+                        setShowInstructions(false);
                       }
                       return next;
                     })
@@ -2276,17 +2196,41 @@ export default function HomePage() {
                   Console
                 </Button>
               </QuickTooltip>
+              <QuickTooltip content={showInstructions ? "Close tutorial" : "Open tutorial"}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className={showInstructions ? "h-8 px-3 border-primary text-primary" : "h-8 px-3 text-foreground/60"}
+                  onClick={() =>
+                    setShowInstructions((value) => {
+                      const next = !value;
+                      if (next) {
+                        setShowBotPanel(false);
+                        setShowMethodPicker(false);
+                        setShowConsole(false);
+                      }
+                      return next;
+                    })
+                  }
+                  aria-label={showInstructions ? "Close tutorial" : "Open tutorial"}
+                >
+                  <BookOpen className="h-3.5 w-3.5" />
+                  Tutorial
+                </Button>
+              </QuickTooltip>
+              {/* Help Me Build — disabled for now
               <QuickTooltip content="Help me build">
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-8 px-3"
+                  className={showBotPanel ? "h-8 px-3 border-primary text-primary" : "h-8 px-3 text-foreground/60"}
                   onClick={() =>
                     setShowBotPanel((value) => {
                       const next = !value;
                       if (next) {
                         setShowMethodPicker(false);
                         setShowConsole(false);
+                        setShowInstructions(false);
                       }
                       return next;
                     })
@@ -2297,6 +2241,7 @@ export default function HomePage() {
                   Help Me Build
                 </Button>
               </QuickTooltip>
+              */}
               <QuickTooltip content={showMethodPicker ? "Close method picker" : "Add a new node"}>
                 <Button
                   size="sm"
@@ -2306,6 +2251,7 @@ export default function HomePage() {
                       if (next) {
                         setShowBotPanel(false);
                         setShowConsole(false);
+                        setShowInstructions(false);
                       }
                       return next;
                     })
@@ -2322,7 +2268,7 @@ export default function HomePage() {
           {statusMessage ? <p className="mt-3 text-xs text-foreground/80">{statusMessage}</p> : null}
         </section>
 
-        <div className={showBotPanel || showConsole || showMethodPicker ? "" : "!mt-0"}>
+        <div className={showBotPanel || showConsole || showMethodPicker || showInstructions ? "" : "!mt-0"}>
           <div
             className={`grid transition-[grid-template-rows,opacity,margin-top] duration-300 ease-in-out ${showBotPanel ? "mt-3 grid-rows-[1fr] opacity-100" : "pointer-events-none mt-0 grid-rows-[0fr] opacity-0"}`}
             aria-hidden={!showBotPanel}
@@ -2406,6 +2352,73 @@ export default function HomePage() {
                       </Button>
                     </QuickTooltip>
                   </form>
+                </div>
+              </section>
+            </div>
+          </div>
+
+          <div
+            className={`grid transition-[grid-template-rows,opacity,margin-top] duration-300 ease-in-out ${showInstructions ? "mt-3 grid-rows-[1fr] opacity-100" : "pointer-events-none mt-0 grid-rows-[0fr] opacity-0"}`}
+            aria-hidden={!showInstructions}
+          >
+            <div className="overflow-hidden">
+              <section
+                className={`panel-surface w-full rounded-xl p-4 transition-transform duration-300 ease-in-out ${showInstructions ? "translate-y-0" : "-translate-y-2"}`}
+              >
+                <div className="grid gap-3 text-sm text-foreground/80 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="panel-tile rounded-lg p-3">
+                    <p className="mb-2 text-xs font-semibold tracking-wide text-primary">1. Set Up</p>
+                    <ol className="list-inside list-decimal space-y-1">
+                      <li>Paste your Helius API key above.</li>
+                      <li>Choose your network (Mainnet / Devnet).</li>
+                      <li>Toggle Gatekeeper to route JSON-RPC via the beta endpoint.</li>
+                    </ol>
+                  </div>
+
+                  <div className="panel-tile rounded-lg p-3">
+                    <p className="mb-2 text-xs font-semibold tracking-wide text-primary">2. Build Nodes</p>
+                    <ol className="list-inside list-decimal space-y-1">
+                      <li>Click <strong>Add Node</strong>, search for a method, and insert it.</li>
+                      <li>Drag nodes on the canvas to arrange your flow.</li>
+                      <li>Click the gear icon on a node to open its settings.</li>
+                    </ol>
+                  </div>
+
+                  <div className="panel-tile rounded-lg p-3">
+                    <p className="mb-2 text-xs font-semibold tracking-wide text-primary">3. Configure Params</p>
+                    <ol className="list-inside list-decimal space-y-1">
+                      <li>Fill fields in the Input pane with JSON literals.</li>
+                      <li>Switch a field to <strong>Reference</strong> to map output from another node.</li>
+                      <li>For raw schemas, enter a JSON params array directly.</li>
+                    </ol>
+                  </div>
+
+                  <div className="panel-tile rounded-lg p-3">
+                    <p className="mb-2 text-xs font-semibold tracking-wide text-primary">4. Execute &amp; Inspect</p>
+                    <ol className="list-inside list-decimal space-y-1">
+                      <li>Use the canvas toolbar to run all, run from selected, stop, or reset.</li>
+                      <li>Open node settings to inspect outputs and errors.</li>
+                      <li>Status dots show idle, running, success, or error per node.</li>
+                    </ol>
+                  </div>
+
+                  <div className="panel-tile rounded-lg p-3">
+                    <p className="mb-2 text-xs font-semibold tracking-wide text-primary">5. Import &amp; Export</p>
+                    <ol className="list-inside list-decimal space-y-1">
+                      <li>Use the canvas toolbar icons to export or import workflow JSON.</li>
+                      <li>Import is also available on the empty canvas before adding nodes.</li>
+                      <li>Optionally include node outputs in exports.</li>
+                    </ol>
+                  </div>
+
+                  <div className="panel-tile rounded-lg p-3">
+                    <p className="mb-2 text-xs font-semibold tracking-wide text-primary">6. Troubleshooting</p>
+                    <ol className="list-inside list-decimal space-y-1">
+                      <li>Invalid params? Check parameter order and types for that method.</li>
+                      <li>Omit optional values instead of sending null.</li>
+                      <li>If a reference path fails, run the source node first.</li>
+                    </ol>
+                  </div>
                 </div>
               </section>
             </div>
