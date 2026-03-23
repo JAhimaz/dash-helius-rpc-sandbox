@@ -1521,6 +1521,20 @@ export default function HomePage() {
           result = Number(result.toFixed(12));
 
           output = { input: inputValue, operation, operand, result };
+        } else if (node.method === "Script") {
+          const inputParam = node.params.find((p) => p.name === "input");
+          const codeParam = node.params.find((p) => p.name === "code");
+
+          const input = inputParam ? resolveParamValue(inputParam.value, outputsByNodeId) : null;
+          const code = String(codeParam?.value.type === "literal" ? codeParam.value.value ?? "" : "");
+
+          if (!code.trim()) {
+            throw new Error("Script node has no code.");
+          }
+
+          // eslint-disable-next-line @typescript-eslint/no-implied-eval
+          const fn = new Function("input", code);
+          output = fn(input);
         } else if (node.method === "Filter") {
           const inputParam = node.params.find((p) => p.name === "input");
           const pathParam = node.params.find((p) => p.name === "path");
@@ -1556,6 +1570,11 @@ export default function HomePage() {
           }
         } else {
           output = getCustomNodeOutput(node, outputsByNodeId);
+        }
+
+        if (node.method === "Script" && (output === null || output === undefined)) {
+          outputsByNodeId.set(node.id, output);
+          return { success: true };
         }
 
         setNodeOutput(node.id, output);
@@ -1952,6 +1971,9 @@ export default function HomePage() {
               for (const downstreamNodeId of iterationDownstream) {
                 const dsResult = await executeSingleNode(downstreamNodeId, outputsByNodeId, executionController.signal);
                 if (!dsResult.success) return dsResult;
+                // If this downstream node returned null, skip the rest of the chain for this iteration
+                const dsOutput = outputsByNodeId.get(downstreamNodeId);
+                if (dsOutput === null || dsOutput === undefined) break;
               }
             }
 

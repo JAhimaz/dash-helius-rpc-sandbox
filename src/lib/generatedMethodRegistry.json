@@ -5409,6 +5409,35 @@
       "errors": []
     },
     {
+      "method": "Script",
+      "docsUrl": "#custom/script",
+      "category": "custom",
+      "transport": "custom",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "input",
+            "type": "any",
+            "required": false,
+            "description": "Input data available as `input` in the script. Use a reference to pull from a prior node."
+          },
+          {
+            "name": "code",
+            "type": "string",
+            "required": true,
+            "description": "JavaScript function body. Has access to `input` (the resolved input param). Return a value to set as this node's output. Returning null/undefined skips downstream nodes in a List iteration."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": { "result": "any value returned by the script" }
+      },
+      "errors": []
+    },
+    {
       "method": "Value Aggregator",
       "docsUrl": "#custom/value-aggregator",
       "category": "custom",

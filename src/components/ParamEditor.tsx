@@ -25,7 +25,7 @@ const CUSTOM_LITERAL_OPTION = "__custom__";
 const CUSTOM_LITERAL_SENTINEL = "__custom_input__";
 
 /** Fields that are fixed choices and should never allow a Reference source. */
-const LITERAL_ONLY_FIELDS = new Set(["operation"]);
+const LITERAL_ONLY_FIELDS = new Set(["operation", "code"]);
 
 const PREDEFINED_LITERAL_OPTIONS: Record<string, string[]> = {
   commitment: ["processed", "confirmed", "finalized"],
@@ -211,6 +211,84 @@ export function ParamEditor({
           placeholder='{"id":"assetMintAddress"}'
         />
         <p className="text-xs text-foreground/65">Unknown schema: enter params as valid JSON (object or array).</p>
+      </div>
+    );
+  }
+
+  if (methodEntry?.method === "Script") {
+    const inputParam = node.params.find((p) => p.name === "input") ?? {
+      name: "input",
+      value: { type: "literal", value: null } as ParamValue,
+    };
+    const codeParam = node.params.find((p) => p.name === "code");
+    const codeValue = codeParam?.value.type === "literal" && typeof codeParam.value.value === "string" ? codeParam.value.value : "";
+    const isRef = inputParam.value.type === "ref";
+
+    return (
+      <div className="space-y-3">
+        {/* Input data */}
+        <div className="space-y-2 rounded-md border border-border p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-medium text-foreground">Input</p>
+              <p className="text-xs text-foreground/65">Data available as <code className="rounded bg-black/30 px-1">input</code> in the script.</p>
+            </div>
+            <select
+              className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+              value={isRef ? "ref" : "literal"}
+              onChange={(event) => {
+                if (event.target.value === "ref") {
+                  if (sourceNodes.length === 0) return;
+                  onParamChange("input", { type: "ref", nodeId: sourceNodes[0]?.id ?? "", path: "" });
+                } else {
+                  onParamChange("input", { type: "literal", value: null });
+                }
+              }}
+            >
+              <option value="literal">Literal</option>
+              <option value="ref" disabled={sourceNodes.length === 0}>Reference</option>
+            </select>
+          </div>
+          {isRef && inputParam.value.type === "ref" ? (
+            <JsonPathPicker
+              sourceNodes={sourceNodes}
+              selectedNodeId={inputParam.value.nodeId}
+              selectedPath={inputParam.value.path}
+              onChange={(value) => {
+                onParamChange("input", { type: "ref", nodeId: value.nodeId, path: value.path });
+              }}
+            />
+          ) : (
+            <Textarea
+              className="min-h-16 font-mono text-xs"
+              value={inputParam.value.type === "literal" ? (typeof inputParam.value.value === "string" ? inputParam.value.value : JSON.stringify(inputParam.value.value ?? "", null, 2)) : ""}
+              onChange={(event) => {
+                let parsed: unknown = event.target.value;
+                try { parsed = JSON.parse(event.target.value); } catch { /* keep as string */ }
+                onParamChange("input", { type: "literal", value: parsed });
+              }}
+              placeholder="JSON value or leave empty"
+            />
+          )}
+        </div>
+
+        {/* Code editor */}
+        <div className="space-y-2 rounded-md border border-border p-3">
+          <div>
+            <p className="text-sm font-medium text-foreground">Code</p>
+            <p className="text-xs text-foreground/65">
+              JavaScript function body. Access data via <code className="rounded bg-black/30 px-1">input</code>. Use <code className="rounded bg-black/30 px-1">return</code> to set the output.
+              Returning <code className="rounded bg-black/30 px-1">null</code> skips downstream nodes in a List iteration.
+            </p>
+          </div>
+          <Textarea
+            className="min-h-40 font-mono text-xs leading-relaxed"
+            value={codeValue}
+            onChange={(event) => onParamChange("code", { type: "literal", value: event.target.value })}
+            placeholder={`// Example: find index of token program\nconst idx = input.transaction.message.accountKeys.findIndex(\n  k => k === "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"\n);\nreturn idx >= 0 ? { tokenProgramIndex: idx, tx: input } : null;`}
+            spellCheck={false}
+          />
+        </div>
       </div>
     );
   }

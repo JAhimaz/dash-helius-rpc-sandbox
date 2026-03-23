@@ -94,6 +94,14 @@ export function NodeSettingsDialog({
 
     const blockWheel = (e: WheelEvent) => {
       const target = e.target as HTMLElement;
+
+      // Allow scrolling inside textareas that have overflowing content
+      if (target.tagName === "TEXTAREA" && target.scrollHeight > target.clientHeight) {
+        const atTop = target.scrollTop === 0 && e.deltaY < 0;
+        const atBottom = target.scrollTop + target.clientHeight >= target.scrollHeight && e.deltaY > 0;
+        if (!atTop && !atBottom) return;
+      }
+
       const scrollable = target.closest("[data-dialog-scroll]");
       if (!scrollable) {
         e.preventDefault();
