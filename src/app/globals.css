@@ -2,24 +2,20 @@
 @import "tailwindcss";
 
 :root {
-  --primary: #8b46ed;
-  --background: #090909;
-  --foreground: #dbdbdb;
-  --success: #4caf50;
-  --warning: #ffc107;
-  --error: #f44336;
-  --border: color-mix(in srgb, var(--primary) 22%, white 12%);
-  --surface: color-mix(in srgb, var(--background) 78%, var(--primary) 22%);
-  --surface-soft: color-mix(in srgb, var(--background) 86%, var(--primary) 14%);
-  --surface-strong: color-mix(in srgb, var(--background) 66%, var(--primary) 34%);
-  --panel-shadow: color-mix(in srgb, var(--primary) 26%, black 74%);
-  --page-gradient:
-    radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--primary) 2%, transparent) 0%, transparent 58%),
-    radial-gradient(circle at 14% -8%, color-mix(in srgb, var(--primary) 36%, transparent) 0%, transparent 44%),
-    radial-gradient(circle at 92% 10%, color-mix(in srgb, var(--primary) 22%, transparent) 0%, transparent 36%),
-    linear-gradient(180deg, color-mix(in srgb, var(--background) 84%, var(--primary) 16%) 0%, var(--background) 62%);
-  --text: #dbdbdb;
-  --text-dim: #a0a0a0;
+  --primary: rgb(29, 29, 31);
+  --background: #fafafa;
+  --foreground: #2e2a35;
+  --success: #6db87a;
+  --warning: #e0a840;
+  --error: #d46a6a;
+  --border: #d8d8d8;
+  --surface: #ffffff;
+  --surface-soft: #fafafa;
+  --surface-strong: color-mix(in srgb, var(--background) 92%, var(--primary) 8%);
+  --panel-shadow: color-mix(in srgb, var(--primary) 10%, rgba(0,0,0,0.08) 90%);
+  --page-gradient: none;
+  --text: #2e2a35;
+  --text-dim: #7a7280;
 }
 
 @theme inline {
@@ -31,7 +27,7 @@
   --color-foreground: var(--foreground);
   --color-border: var(--border);
   --text-primary: var(--text);
-  --text-dim: var(--text-dim); 
+  --text-dim: var(--text-dim);
 }
 
 * {
@@ -41,9 +37,9 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: var(--page-gradient);
+  background: var(--background);
   color: var(--foreground);
-  color-scheme: dark;
+  color-scheme: light;
   font-family: 'Google Sans', sans-serif;
   font-optical-sizing: auto;
   font-weight: 400;
@@ -60,12 +56,11 @@ textarea {
 
 .panel-surface {
   border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface-soft) 86%, transparent);
-  box-shadow: 0 20px 45px -28px var(--panel-shadow);
-  backdrop-filter: blur(14px);
+  background: var(--surface);
+  box-shadow: 0 2px 8px -2px rgba(0,0,0,0.06);
 }
 
 .panel-tile {
-  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
-  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  border: 1px solid var(--border);
+  background: var(--surface);
 }

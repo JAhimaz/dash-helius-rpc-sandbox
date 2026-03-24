@@ -156,7 +156,7 @@ function PathNode({
           className={cn(
             "flex min-w-0 flex-1 items-center gap-2 rounded px-2 py-1 text-left text-xs transition-colors",
             isSelected
-              ? "bg-primary text-primary-foreground"
+              ? "bg-primary text-white outline-none"
               : "text-foreground/80 hover:bg-foreground/10",
           )}
           onClick={() => onSelect(entry.path)}
@@ -164,7 +164,7 @@ function PathNode({
           {isEachChild ? (
             <span className={cn(
               "shrink-0 rounded px-1 py-0.5 text-[10px] font-medium",
-              isSelected ? "bg-white/20 text-white" : "bg-primary/20 text-primary",
+              isSelected ? "bg-white/20 text-white" : "bg-primary/10 text-primary",
             )}>each</span>
           ) : null}
           <span className="truncate font-mono">{entry.label}</span>
@@ -283,7 +283,7 @@ export function JsonPathPicker({
         />
       </div>
 
-      <div className="max-h-48 overflow-auto rounded-md border border-border bg-black/20 py-1">
+      <div className="max-h-48 overflow-auto rounded-md border border-border bg-foreground/5 py-1">
         {activeNode?.output === undefined ? (
           <p className="p-3 text-center text-xs text-foreground/45">Run the source node first to see available paths.</p>
         ) : filteredTree.length === 0 ? (

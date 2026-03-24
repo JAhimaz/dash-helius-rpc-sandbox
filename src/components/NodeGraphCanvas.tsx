@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
 
 const NODE_WIDTH = 330;
 const NODE_HEIGHT = 168;
-const EDGE_COLORS = ["#ff5f57", "#58d26b", "#ffd60a", "#3a9dff", "#ff8a3d", "#b18cff", "#00c2b8"];
+const EDGE_COLOR = "#c8c8c8";
 
 export interface NodeGraphConnection {
   id: string;
@@ -78,6 +78,7 @@ interface WorkflowNodeData {
   incomingCount: number;
   outgoingCount: number;
   isSelected: boolean;
+  activeHandles: Set<string>;
   onOpenSettings: () => void;
   onDelete: () => void;
   [key: string]: unknown;
@@ -94,7 +95,8 @@ function statusClass(status: WorkflowNode["status"]): string {
 
 // ── Handle style (invisible dots, just connection points) ──
 
-const handleStyle = { background: "transparent", width: 8, height: 8, border: "none" };
+const activeHandleStyle = { background: "#c8c8c8", width: 8, height: 8, border: "none", borderRadius: "50%" };
+const hiddenHandleStyle = { background: "transparent", width: 8, height: 8, border: "none" };
 
 // ── Custom node component ──
 
@@ -102,22 +104,22 @@ function WorkflowNodeCard({ data }: NodeProps<Node<WorkflowNodeData>>) {
   return (
     <div
       className={cn(
-        "rounded-lg border bg-[color-mix(in_srgb,var(--surface-soft)_84%,black_16%)] shadow-[0_16px_28px_-20px_black] select-none",
+        "rounded-lg border bg-[color-mix(in_srgb,var(--surface-soft)_90%,white_10%)] shadow-[0_4px_16px_-6px_rgba(0,0,0,0.1)] select-none transition-[border-color] duration-200",
         data.isSelected
-          ? "border-primary/90 ring-2 ring-primary/35"
-          : "border-border/90",
+          ? "border-foreground"
+          : "border-border",
       )}
       style={{ width: NODE_WIDTH, height: NODE_HEIGHT }}
     >
-      {/* Handles on all 4 sides for directional edges */}
-      <Handle type="target" position={Position.Left} id="left" style={handleStyle} />
-      <Handle type="target" position={Position.Top} id="top" style={handleStyle} />
-      <Handle type="target" position={Position.Right} id="right-in" style={handleStyle} />
-      <Handle type="target" position={Position.Bottom} id="bottom-in" style={handleStyle} />
-      <Handle type="source" position={Position.Right} id="right" style={handleStyle} />
-      <Handle type="source" position={Position.Bottom} id="bottom" style={handleStyle} />
-      <Handle type="source" position={Position.Left} id="left-out" style={handleStyle} />
-      <Handle type="source" position={Position.Top} id="top-out" style={handleStyle} />
+      {/* Handles on all 4 sides — only visible when connected */}
+      <Handle type="target" position={Position.Left} id="left" style={data.activeHandles.has("left") ? activeHandleStyle : hiddenHandleStyle} />
+      <Handle type="target" position={Position.Top} id="top" style={data.activeHandles.has("top") ? activeHandleStyle : hiddenHandleStyle} />
+      <Handle type="target" position={Position.Right} id="right-in" style={data.activeHandles.has("right-in") ? activeHandleStyle : hiddenHandleStyle} />
+      <Handle type="target" position={Position.Bottom} id="bottom-in" style={data.activeHandles.has("bottom-in") ? activeHandleStyle : hiddenHandleStyle} />
+      <Handle type="source" position={Position.Right} id="right" style={data.activeHandles.has("right") ? activeHandleStyle : hiddenHandleStyle} />
+      <Handle type="source" position={Position.Bottom} id="bottom" style={data.activeHandles.has("bottom") ? activeHandleStyle : hiddenHandleStyle} />
+      <Handle type="source" position={Position.Left} id="left-out" style={data.activeHandles.has("left-out") ? activeHandleStyle : hiddenHandleStyle} />
+      <Handle type="source" position={Position.Top} id="top-out" style={data.activeHandles.has("top-out") ? activeHandleStyle : hiddenHandleStyle} />
 
       <div className="flex h-full flex-col justify-between p-3">
         <div className="flex items-start justify-between gap-2">
@@ -131,7 +133,7 @@ function WorkflowNodeCard({ data }: NodeProps<Node<WorkflowNodeData>>) {
             </p>
           </div>
           <div className="text-right">
-            <span className="rounded border border-border/70 bg-black/35 px-2 py-0.5 font-mono text-[11px] text-foreground/80">
+            <span className="rounded border border-border/70 bg-foreground/8 px-2 py-0.5 font-mono text-[11px] text-foreground/80">
               {data.callCount} / {data.callTarget === null ? "-" : data.callTarget}
             </span>
             <p className="mt-1 text-[11px] text-foreground/50">
@@ -166,8 +168,8 @@ function WorkflowNodeCard({ data }: NodeProps<Node<WorkflowNodeData>>) {
               className={cn(
                 "inline-block rounded px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase leading-none",
                 data.transport === "websocket"
-                  ? "bg-yellow-500/20 text-yellow-400"
-                  : "bg-blue-500/20 text-blue-400",
+                  ? "bg-amber-100 text-amber-700"
+                  : "bg-blue-100 text-blue-700",
               )}
             >
               {data.transport === "websocket" ? "WSS" : "POST"}
@@ -305,7 +307,7 @@ function CanvasControls({
         <QuickTooltip content="Execute all">
           <Button
             size="sm"
-            className="h-8 w-8 p-0"
+            className="h-8 w-8 p-0 bg-success text-white hover:bg-[#5a9c66]"
             onClick={onExecuteAll}
             disabled={isExecuting || !hasNodes}
             aria-label="Execute all"
@@ -421,6 +423,25 @@ function NodeGraphCanvasInner({
     return { incomingCounts: inc, outgoingCounts: out };
   }, [connections]);
 
+  // Compute which handles are actively connected per node
+  const activeHandlesByNodeId = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    const posMap = new Map<string, { x: number; y: number }>();
+    for (const node of workflowNodes) {
+      posMap.set(node.id, node.position);
+    }
+    for (const conn of connections) {
+      const sourcePos = posMap.get(conn.fromNodeId) ?? { x: 0, y: 0 };
+      const targetPos = posMap.get(conn.toNodeId) ?? { x: 0, y: 0 };
+      const { sourceHandle, targetHandle } = getHandleIds(sourcePos, targetPos);
+      if (!map.has(conn.fromNodeId)) map.set(conn.fromNodeId, new Set());
+      if (!map.has(conn.toNodeId)) map.set(conn.toNodeId, new Set());
+      map.get(conn.fromNodeId)!.add(sourceHandle);
+      map.get(conn.toNodeId)!.add(targetHandle);
+    }
+    return map;
+  }, [workflowNodes, connections]);
+
   // Build React Flow nodes from workflow data
   const rfNodesFromProps = useMemo<Node<WorkflowNodeData>[]>(
     () =>
@@ -446,6 +467,7 @@ function NodeGraphCanvasInner({
           incomingCount: incomingCounts[node.id] ?? 0,
           outgoingCount: outgoingCounts[node.id] ?? 0,
           isSelected: node.id === selectedNodeId,
+          activeHandles: activeHandlesByNodeId.get(node.id) ?? new Set(),
           onOpenSettings: () => onOpenNodeSettings(node.id),
           onDelete: () => onDeleteNode(node.id),
         },
@@ -458,6 +480,7 @@ function NodeGraphCanvasInner({
       executionOrderByNodeId,
       incomingCounts,
       outgoingCounts,
+      activeHandlesByNodeId,
       onOpenNodeSettings,
       onDeleteNode,
     ],
@@ -483,10 +506,12 @@ function NodeGraphCanvasInner({
   // Map connections → React Flow edges with directional handles
   const rfEdges = useMemo<Edge[]>(
     () =>
-      connections.map((conn, i) => {
+      connections.map((conn) => {
         const sourcePos = positionById.get(conn.fromNodeId) ?? { x: 0, y: 0 };
         const targetPos = positionById.get(conn.toNodeId) ?? { x: 0, y: 0 };
         const { sourceHandle, targetHandle } = getHandleIds(sourcePos, targetPos);
+
+        const edgeColor = EDGE_COLOR;
 
         return {
           id: conn.id,
@@ -495,11 +520,11 @@ function NodeGraphCanvasInner({
           sourceHandle,
           targetHandle,
           type: "default",
-          style: { stroke: EDGE_COLORS[i % EDGE_COLORS.length], strokeWidth: 2.3, opacity: 0.92 },
+          style: { stroke: edgeColor, strokeWidth: 2.3, opacity: 0.92 },
           data: { paramName: conn.paramName, path: conn.path },
         };
       }),
-    [connections, positionById],
+    [connections, positionById, rfNodes],
   );
 
   // Apply all node changes (position during drag, selection, etc.) to local state
@@ -545,9 +570,9 @@ function NodeGraphCanvasInner({
         nodesDraggable
         panOnDrag
         zoomOnScroll
-        className="!bg-[#120e1d]"
+        className="!bg-[var(--background)]"
       >
-        <Background variant={BackgroundVariant.Dots} color="rgba(180,120,255,0.25)" gap={24} size={1.5} />
+        <Background variant={BackgroundVariant.Dots} color="rgba(0,0,0,0.25)" gap={24} size={1.5} />
         <CanvasControls
           isExecuting={isExecuting}
           hasActiveWebSockets={hasActiveWebSockets}

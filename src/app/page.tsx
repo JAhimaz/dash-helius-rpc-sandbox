@@ -2549,13 +2549,13 @@ export default function HomePage() {
                     </Button>
                   </QuickTooltip>
                 </div>
-                <div className="h-[260px] overflow-y-auto rounded-lg bg-black/30 p-3 font-mono text-xs">
+                <div className="h-[260px] overflow-y-auto rounded-lg bg-foreground/5 p-3 font-mono text-xs">
                   {consoleLogs.length === 0 ? (
                     <p className="text-foreground/40">No output yet.</p>
                   ) : (
                     consoleLogs.map((entry, index) => (
                       <details key={`${entry.timestamp}-${index}`} className="mb-1 group">
-                        <summary className="flex cursor-pointer items-center gap-1.5 rounded px-1 py-0.5 hover:bg-white/5 select-none list-none">
+                        <summary className="flex cursor-pointer items-center gap-1.5 rounded px-1 py-0.5 hover:bg-foreground/5 select-none list-none">
                           <ChevronDown className="h-3 w-3 text-foreground/40 transition-transform group-open:rotate-0 -rotate-90" />
                           <span className="text-foreground/60">{entry.timestamp}</span>
                           <span className="font-semibold text-primary">{entry.nodeName}</span>
@@ -2563,7 +2563,7 @@ export default function HomePage() {
                         <div className="relative mt-1 mb-2 ml-[18px]">
                           <button
                             type="button"
-                            className="absolute right-2 top-2 rounded-md border border-border/50 bg-black/40 p-1 text-foreground/40 hover:text-foreground/80 transition-colors"
+                            className="absolute right-2 top-2 rounded-md border border-border/50 bg-foreground/10 p-1 text-foreground/40 hover:text-foreground/80 transition-colors"
                             aria-label="Copy output"
                             onClick={(event) => {
                               const text = stringifyConsoleOutput(entry.output);
@@ -2580,9 +2580,9 @@ export default function HomePage() {
                             }}
                           >
                             <Copy data-copy-icon className="h-3 w-3" />
-                            <Check data-check-icon className="h-3 w-3 text-green-400" style={{ display: "none" }} />
+                            <Check data-check-icon className="h-3 w-3 text-success" style={{ display: "none" }} />
                           </button>
-                          <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-md border border-border/50 bg-black/30 p-2.5 pr-8 text-foreground/80">
+                          <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-md border border-border/50 bg-foreground/5 p-2.5 pr-8 text-foreground/80">
                             {stringifyConsoleOutput(entry.output)}
                           </pre>
                         </div>
@@ -2674,7 +2674,7 @@ export default function HomePage() {
                     </div>
                   </div>
 
-                  <div className="min-h-0 rounded-lg border border-border bg-background/60">
+                  <div className="flex min-h-0 flex-col rounded-lg border border-border bg-background/60">
                     <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
                       <span className="text-xs font-semibold uppercase tracking-wide text-foreground/70">Method Details</span>
                       <Button
@@ -2695,7 +2695,7 @@ export default function HomePage() {
                         Add Node
                       </Button>
                     </div>
-                    <div className="h-[calc(460px-37px)] overflow-auto p-3">
+                    <div className="min-h-0 flex-1 overflow-auto p-3 pb-6">
                       {!activeMethod ? (
                         <p className="text-xs text-foreground/65">
                           Select a method to see input details and add it as a node.
@@ -2765,7 +2765,7 @@ export default function HomePage() {
 
         <section className="space-y-3">
           {orderedNodes.length === 0 ? (
-            <div className="flex h-[680px] flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border bg-[#120e1d] text-center">
+            <div className="flex h-[680px] flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border bg-background text-center">
               <p className="text-sm text-foreground/70">Add your first RPC node to begin building the workflow.</p>
               <div>
                 <input
