@@ -1,3 +1,7 @@
+---
+description: Generate valid workflow JSON for DASH, a visual Solana RPC workflow builder. Use this skill when users ask to build, create, or generate a workflow.
+---
+
 # DASH Workflow Builder — LLM Skill Guide
 
 You are generating workflow JSON for DASH, a visual Solana RPC workflow builder. Users will ask you to build workflows that chain RPC calls, transform data, filter results, and aggregate values. Your output must be a valid JSON object that can be imported directly into the app.
