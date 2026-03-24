@@ -5607,6 +5607,859 @@
       "errors": []
     },
     {
+      "method": "getClusterNodes",
+      "docsUrl": "https://www.helius.dev/docs/rpc/guides/getclusternodes",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": []
+      },
+      "response": {
+        "kind": "json_example",
+        "value": [
+          {
+            "pubkey": "9QzsJf7LPLj8GkXbYT3LFDKqsj2hHG7TA3xinJHu8epQ",
+            "gossip": "10.239.6.48:8001",
+            "tpu": "10.239.6.48:8856",
+            "rpc": "10.239.6.48:8899",
+            "version": "1.0.0 c375ce1f",
+            "featureSet": 0,
+            "shredVersion": 0
+          }
+        ]
+      },
+      "errors": []
+    },
+    {
+      "method": "getEpochSchedule",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getepochschedule",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": []
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "slotsPerEpoch": 8192,
+          "leaderScheduleSlotOffset": 8192,
+          "warmup": true,
+          "firstNormalEpoch": 8,
+          "firstNormalSlot": 8160
+        }
+      },
+      "errors": []
+    },
+    {
+      "method": "getEpochInfo",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getepochinfo",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "commitment",
+            "type": "string",
+            "required": false,
+            "description": "The commitment level: confirmed, finalized."
+          },
+          {
+            "name": "minContextSlot",
+            "type": "number",
+            "required": false,
+            "description": "The minimum slot that the request can be evaluated at."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "absoluteSlot": 166598,
+          "blockHeight": 166500,
+          "epoch": 27,
+          "slotIndex": 2790,
+          "slotsInEpoch": 8192,
+          "transactionCount": 22661093
+        }
+      },
+      "errors": []
+    },
+    {
+      "method": "getVersion",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getversion",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": []
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "solana-core": "1.16.7",
+          "feature-set": 2891131721
+        }
+      },
+      "errors": []
+    },
+    {
+      "method": "getVoteAccounts",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getvoteaccounts",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "commitment",
+            "type": "string",
+            "required": false,
+            "description": "The commitment level: confirmed, finalized, processed."
+          },
+          {
+            "name": "votePubkey",
+            "type": "string",
+            "required": false,
+            "description": "Filter to a specific validator vote account address."
+          },
+          {
+            "name": "keepUnstakedDelinquents",
+            "type": "boolean",
+            "required": false,
+            "description": "Include delinquent validators with no stake."
+          },
+          {
+            "name": "delinquentSlotDistance",
+            "type": "number",
+            "required": false,
+            "description": "Slots behind threshold to mark validators as delinquent."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "current": [
+            {
+              "votePubkey": "3ZT31jkAGhUaw8jsy4bTknwBMP8i4Eueh52By4zXcsVw",
+              "nodePubkey": "B97CCUW3AEZFGy6uUg6zUdnNYvnVq5VG8PUtb2HayTDD",
+              "activatedStake": 42,
+              "commission": 0,
+              "lastVote": 147
+            }
+          ],
+          "delinquent": []
+        }
+      },
+      "errors": []
+    },
+    {
+      "method": "getTokenLargestAccounts",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/gettokenlargestaccounts",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "address",
+            "type": "string",
+            "required": true,
+            "description": "Token mint address to find the largest holders for."
+          },
+          {
+            "name": "commitment",
+            "type": "string",
+            "required": false,
+            "description": "The commitment level: confirmed, finalized, processed."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "context": { "slot": 1114 },
+          "value": [
+            {
+              "address": "FYjHNoFtSQ5uijKrZFyYAxvEr87hsKXkXcxkcmkBAf4r",
+              "amount": "771",
+              "decimals": 2,
+              "uiAmountString": "7.71"
+            }
+          ]
+        }
+      },
+      "errors": []
+    },
+    {
+      "method": "getTokenSupply",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/gettokensupply",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "address",
+            "type": "string",
+            "required": true,
+            "description": "Token mint address to retrieve supply metrics for."
+          },
+          {
+            "name": "commitment",
+            "type": "string",
+            "required": false,
+            "description": "The commitment level: confirmed, finalized, processed."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "context": { "slot": 1114 },
+          "value": {
+            "amount": "100000",
+            "decimals": 2,
+            "uiAmount": 1000,
+            "uiAmountString": "1000"
+          }
+        }
+      },
+      "errors": []
+    },
+    {
+      "method": "getSupply",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getsupply",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "commitment",
+            "type": "string",
+            "required": false,
+            "description": "The commitment level: confirmed, finalized, processed."
+          },
+          {
+            "name": "excludeNonCirculatingAccountsList",
+            "type": "boolean",
+            "required": false,
+            "description": "Exclude the list of non-circulating accounts for faster response."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "context": { "slot": 1114 },
+          "value": {
+            "total": 1016000,
+            "circulating": 16000,
+            "nonCirculating": 1000000
+          }
+        }
+      },
+      "errors": []
+    },
+    {
+      "method": "getSlotLeaders",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getslotleaders",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "slot",
+            "type": "number",
+            "required": true,
+            "description": "Starting slot number to retrieve leaders from."
+          },
+          {
+            "name": "limit",
+            "type": "number",
+            "required": true,
+            "description": "Number of consecutive slots to retrieve leaders for (1-5000)."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": [
+          "ChorusmmK7i1AxXeiTtQgQZhQNiXYU84ULeaYF1EH15n",
+          "Awes4Tr6TX8JDzEhCZY2QVNimT6iD1zWHzf1vNyGvpLM"
+        ]
+      },
+      "errors": []
+    },
+    {
+      "method": "getStakeMinimumDelegation",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getstakeminimumdelegation",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "commitment",
+            "type": "string",
+            "required": false,
+            "description": "The commitment level: confirmed, finalized, processed."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "context": { "slot": 501 },
+          "value": 1000000000
+        }
+      },
+      "errors": []
+    },
+    {
+      "method": "getSignatureStatuses",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getsignaturestatuses",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "transaction",
+            "type": "array",
+            "required": true,
+            "description": "Array of transaction signatures (up to 256), as base-58 encoded strings."
+          },
+          {
+            "name": "searchTransactionHistory",
+            "type": "boolean",
+            "required": false,
+            "description": "Search beyond recent status cache to find older transactions."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "context": { "slot": 82 },
+          "value": [
+            {
+              "slot": 48,
+              "confirmations": null,
+              "err": null,
+              "confirmationStatus": "finalized"
+            }
+          ]
+        }
+      },
+      "errors": []
+    },
+    {
+      "method": "getRecentPerformanceSamples",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getrecentperformancesamples",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "limit",
+            "type": "number",
+            "required": false,
+            "description": "Number of performance samples to return (max 720)."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": [
+          {
+            "slot": 348125,
+            "numTransactions": 126,
+            "numNonVoteTransactions": 1,
+            "samplePeriodSecs": 60,
+            "numSlots": 126
+          }
+        ]
+      },
+      "errors": []
+    },
+    {
+      "method": "getRecentPrioritizationFees",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getrecentprioritizationfees",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "addresses",
+            "type": "array",
+            "required": false,
+            "description": "Array of account addresses (max 128) to filter priority fees for."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": [
+          {
+            "slot": 348125,
+            "prioritizationFee": 1234
+          }
+        ]
+      },
+      "errors": []
+    },
+    {
+      "method": "getMinimumBalanceForRentExemption",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getminimumbalanceforrentexemption",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "address",
+            "type": "number",
+            "required": true,
+            "description": "Size of account data in bytes."
+          },
+          {
+            "name": "commitment",
+            "type": "string",
+            "required": false,
+            "description": "The commitment level: confirmed, finalized, processed."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": 500
+      },
+      "errors": []
+    },
+    {
+      "method": "getLeaderSchedule",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getleaderschedule",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "slot",
+            "type": "number",
+            "required": false,
+            "description": "Epoch or slot number to retrieve the leader schedule for. If omitted, returns the current epoch."
+          },
+          {
+            "name": "commitment",
+            "type": "string",
+            "required": false,
+            "description": "The commitment level: confirmed, finalized, processed."
+          },
+          {
+            "name": "identity",
+            "type": "string",
+            "required": false,
+            "description": "Validator identity public key to filter results for a specific validator."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "4Qkev8aNZcqFNSRhQzwyLMFSsi94jHqE8WNVTJzTP99F": [0, 1, 2, 3]
+        }
+      },
+      "errors": []
+    },
+    {
+      "method": "getMaxRetransmitSlot",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getmaxretransmitslot",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": []
+      },
+      "response": {
+        "kind": "json_example",
+        "value": 1234
+      },
+      "errors": []
+    },
+    {
+      "method": "getMaxShredInsertSlot",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getmaxshredinsertslot",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": []
+      },
+      "response": {
+        "kind": "json_example",
+        "value": 1234
+      },
+      "errors": []
+    },
+    {
+      "method": "getLatestBlockhash",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getlatestblockhash",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "commitment",
+            "type": "string",
+            "required": false,
+            "description": "The commitment level: confirmed, finalized, processed."
+          },
+          {
+            "name": "minContextSlot",
+            "type": "number",
+            "required": false,
+            "description": "The minimum slot that the request can be evaluated at."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "context": { "slot": 2792 },
+          "value": {
+            "blockhash": "EkSnNWid2cvwEVnVx9aBqawnmiCNiDgp3gUdkDPTKN1N",
+            "lastValidBlockHeight": 3090
+          }
+        }
+      },
+      "errors": []
+    },
+    {
+      "method": "getFirstAvailableBlock",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getfirstavailableblock",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": []
+      },
+      "response": {
+        "kind": "json_example",
+        "value": 250000
+      },
+      "errors": []
+    },
+    {
+      "method": "getGenesisHash",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getgenesishash",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": []
+      },
+      "response": {
+        "kind": "json_example",
+        "value": "GH7ome3EiwEr7tu9JuTh2dpYWBJK3z69Xm1ZE3MEE6JC"
+      },
+      "errors": []
+    },
+    {
+      "method": "getInflationGovernor",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getinflationgovernor",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": []
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "initial": 0.15,
+          "terminal": 0.015,
+          "taper": 0.15,
+          "foundation": 0.05,
+          "foundationTerm": 7
+        }
+      },
+      "errors": []
+    },
+    {
+      "method": "getInflationRate",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getinflationrate",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": []
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "total": 0.149,
+          "validator": 0.148,
+          "foundation": 0.001,
+          "epoch": 100
+        }
+      },
+      "errors": []
+    },
+    {
+      "method": "getInflationReward",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getinflationreward",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "address",
+            "type": "array",
+            "required": true,
+            "description": "List of Solana addresses (validators or delegators) to retrieve staking rewards for, as base-58 encoded strings."
+          },
+          {
+            "name": "commitment",
+            "type": "string",
+            "required": false,
+            "description": "The commitment level: confirmed, finalized."
+          },
+          {
+            "name": "epoch",
+            "type": "number",
+            "required": false,
+            "description": "Specific epoch number to retrieve rewards for. If omitted, returns the most recently distributed rewards."
+          },
+          {
+            "name": "minContextSlot",
+            "type": "number",
+            "required": false,
+            "description": "The minimum slot that the request can be evaluated at."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": [
+          {
+            "epoch": 2,
+            "effectiveSlot": 224,
+            "amount": 2500,
+            "postBalance": 499999442500,
+            "commission": null
+          }
+        ]
+      },
+      "errors": []
+    },
+    {
+      "method": "getIdentity",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getidentity",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": []
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "identity": "2r1F4iWqVcb8M1DbAjQuFpebkQHY9hcVU4WuW2DJBppN"
+        }
+      },
+      "errors": []
+    },
+    {
+      "method": "getHealth",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/gethealth",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": []
+      },
+      "response": {
+        "kind": "json_example",
+        "value": "ok"
+      },
+      "errors": []
+    },
+    {
+      "method": "getHighestSnapshotSlot",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/gethighestsnapshotslot",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": []
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "full": 100,
+          "incremental": 110
+        }
+      },
+      "errors": []
+    },
+    {
+      "method": "getFeeForMessage",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/getfeeformessage",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "transaction",
+            "type": "string",
+            "required": true,
+            "description": "Base-64 encoded serialized Solana transaction message to calculate the fee for."
+          },
+          {
+            "name": "commitment",
+            "type": "string",
+            "required": false,
+            "description": "The commitment level: confirmed, finalized."
+          },
+          {
+            "name": "minContextSlot",
+            "type": "number",
+            "required": false,
+            "description": "The minimum slot that the request can be evaluated at."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "context": { "slot": 5068 },
+          "value": 5000
+        }
+      },
+      "errors": []
+    },
+    {
+      "method": "getPriorityFeeEstimate",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/priority-fee-api/getpriorityfeeestimate",
+      "category": "priority-fee",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "transaction",
+            "type": "string",
+            "required": false,
+            "description": "Base58 or Base64 encoded transaction to estimate priority fees for."
+          },
+          {
+            "name": "accountKeys",
+            "type": "array",
+            "required": false,
+            "description": "Array of account public keys to estimate priority fees for (alternative to transaction)."
+          },
+          {
+            "name": "options.transactionEncoding",
+            "type": "string",
+            "required": false,
+            "description": "Encoding format: Base58, Base64."
+          },
+          {
+            "name": "options.priorityLevel",
+            "type": "string",
+            "required": false,
+            "description": "Priority level: Min, Low, Medium, High, VeryHigh, UnsafeMax."
+          },
+          {
+            "name": "options.includeAllPriorityFeeLevels",
+            "type": "boolean",
+            "required": false,
+            "description": "Return estimates for all priority levels."
+          },
+          {
+            "name": "options.lookbackSlots",
+            "type": "number",
+            "required": false,
+            "description": "Number of recent slots to analyze (1-150)."
+          },
+          {
+            "name": "options.includeVote",
+            "type": "boolean",
+            "required": false,
+            "description": "Include vote transactions in fee calculation."
+          },
+          {
+            "name": "options.recommended",
+            "type": "boolean",
+            "required": false,
+            "description": "Return recommended optimal fee based on current conditions."
+          },
+          {
+            "name": "options.evaluateEmptySlotAsZero",
+            "type": "boolean",
+            "required": false,
+            "description": "Count empty slots as zero-fee slots in calculation."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "priorityFeeEstimate": 120000,
+          "priorityFeeLevels": {
+            "min": 0,
+            "low": 2,
+            "medium": 10082,
+            "high": 100000,
+            "veryHigh": 1000000,
+            "unsafeMax": 50000000
+          }
+        }
+      },
+      "errors": []
+    },
+    {
+      "method": "simulateBundle",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/simulatebundle",
+      "schema": "unknown",
+      "errors": []
+    },
+    {
+      "method": "isBlockhashValid",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/isblockhashvalid",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": [
+          {
+            "name": "blockhash",
+            "type": "string",
+            "required": true,
+            "description": "Blockhash to check validity for, as a base-58 encoded string."
+          },
+          {
+            "name": "commitment",
+            "type": "string",
+            "required": false,
+            "description": "The commitment level: confirmed, finalized, processed."
+          },
+          {
+            "name": "minContextSlot",
+            "type": "number",
+            "required": false,
+            "description": "The minimum slot that the request can be evaluated at."
+          }
+        ]
+      },
+      "response": {
+        "kind": "json_example",
+        "value": {
+          "context": { "slot": 2483 },
+          "value": false
+        }
+      },
+      "errors": []
+    },
+    {
+      "method": "minimumLedgerSlot",
+      "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/minimumledgerslot",
+      "schema": "known",
+      "params": {
+        "kind": "table",
+        "fields": []
+      },
+      "response": {
+        "kind": "json_example",
+        "value": 1234
+      },
+      "errors": []
+    },
+    {
       "method": "requestAirdrop",
       "docsUrl": "https://www.helius.dev/docs/api-reference/rpc/http/requestairdrop",
       "schema": "known",

@@ -222,6 +222,80 @@ function parseRawParams(raw: string): unknown {
   return JSON.parse(raw) as unknown;
 }
 
+/**
+ * Run user-provided JS in a sandboxed iframe with no access to the parent
+ * page, cookies, localStorage, or same-origin content. Communication happens
+ * via postMessage with structured-clone-safe data only.
+ */
+function runSandboxedScript(code: string, input: unknown): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const iframe = document.createElement("iframe");
+    // allow-scripts lets JS run; no allow-same-origin means the iframe
+    // cannot access the parent page, cookies, localStorage, etc.
+    iframe.sandbox.add("allow-scripts");
+    iframe.style.display = "none";
+    document.body.appendChild(iframe);
+
+    const TIMEOUT_MS = 10_000;
+    let settled = false;
+
+    const cleanup = () => {
+      if (settled) return;
+      settled = true;
+      window.removeEventListener("message", onMessage);
+      iframe.remove();
+    };
+
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error("Script timed out (10s limit)."));
+    }, TIMEOUT_MS);
+
+    const onMessage = (event: MessageEvent) => {
+      if (event.source !== iframe.contentWindow) return;
+      clearTimeout(timer);
+      cleanup();
+      const { ok, value, error } = event.data as { ok: boolean; value?: unknown; error?: string };
+      if (ok) {
+        resolve(value);
+      } else {
+        reject(new Error(error ?? "Script execution failed."));
+      }
+    };
+
+    window.addEventListener("message", onMessage);
+
+    const script = `
+      <script>
+        "use strict";
+        (function() {
+          // Capture real parent ref before sandboxing
+          var _host = window.parent;
+          // Block user code from accessing parent/top
+          try { Object.defineProperty(window, "parent", { value: window }); } catch {}
+          try { Object.defineProperty(window, "top", { value: window }); } catch {}
+
+          window.addEventListener("message", function(e) {
+            try {
+              var fn = new Function("input", e.data.code);
+              var result = fn(e.data.input);
+              _host.postMessage({ ok: true, value: result }, "*");
+            } catch (err) {
+              _host.postMessage({ ok: false, error: err.message || String(err) }, "*");
+            }
+          });
+        })();
+      <\/script>
+    `;
+
+    iframe.srcdoc = script;
+    iframe.onload = () => {
+      if (settled) return;
+      iframe.contentWindow?.postMessage({ code, input }, "*");
+    };
+  });
+}
+
 function pruneNullish(value: unknown): unknown {
   if (value === null || value === undefined) {
     return undefined;
@@ -1125,6 +1199,13 @@ export default function HomePage() {
           .map((entry) => entry.method),
       },
       {
+        id: "priority-fee",
+        label: "Priority Fee",
+        methods: methodEntries
+          .filter((entry) => getMethodCategoryId(entry) === "priority-fee")
+          .map((entry) => entry.method),
+      },
+      {
         id: "custom",
         label: "Custom",
         methods: methodEntries
@@ -1532,9 +1613,7 @@ export default function HomePage() {
             throw new Error("Script node has no code.");
           }
 
-          // eslint-disable-next-line @typescript-eslint/no-implied-eval
-          const fn = new Function("input", code);
-          output = fn(input);
+          output = await runSandboxedScript(code, input);
         } else if (node.method === "Filter") {
           const inputParam = node.params.find((p) => p.name === "input");
           const pathParam = node.params.find((p) => p.name === "path");

@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { QuickTooltip } from "@/components/ui/quick-tooltip";
 import type { WorkflowNode } from "@/store/workflowStore";
 import type { WorkflowExport } from "@/lib/workflowSchema";
+import { getMethodEntry } from "@/lib/methodRegistry";
 import { cn } from "@/lib/utils";
 
 const NODE_WIDTH = 330;
@@ -68,6 +69,7 @@ interface NodeGraphCanvasProps {
 interface WorkflowNodeData {
   label: string;
   method: string;
+  transport: string;
   status: WorkflowNode["status"];
   output: unknown;
   callCount: number;
@@ -119,7 +121,7 @@ function WorkflowNodeCard({ data }: NodeProps<Node<WorkflowNodeData>>) {
 
       <div className="flex h-full flex-col justify-between p-3">
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
+          <div className="min-w-0 overflow-hidden">
             <p className="truncate text-xs font-semibold tracking-wide text-foreground">
               {data.label}
             </p>
@@ -158,51 +160,65 @@ function WorkflowNodeCard({ data }: NodeProps<Node<WorkflowNodeData>>) {
           </p>
         ) : null}
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="space-y-1">
+          {data.transport !== "custom" && (
             <span
               className={cn(
-                "h-2.5 w-2.5 rounded-full",
-                data.status === "running" && data.method === "WebSocket"
-                  ? "bg-success"
-                  : statusClass(data.status),
+                "inline-block rounded px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase leading-none",
+                data.transport === "websocket"
+                  ? "bg-yellow-500/20 text-yellow-400"
+                  : "bg-blue-500/20 text-blue-400",
               )}
-            />
-            <span className="text-[11px] uppercase tracking-wide text-foreground/70">
-              {data.status === "running" && data.method === "WebSocket"
-                ? "live"
-                : data.status}
+            >
+              {data.transport === "websocket" ? "WSS" : "POST"}
             </span>
-          </div>
-          <div className="flex items-center gap-1">
-            <QuickTooltip content="Delete node">
-              <Button
-                size="sm"
-                variant="destructive"
-                className="h-7 w-7 p-0"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  data.onDelete();
-                }}
-                aria-label="Delete node"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            </QuickTooltip>
-            <QuickTooltip content="Node settings">
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 w-7 p-0"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  data.onOpenSettings();
-                }}
-                aria-label="Open node settings"
-              >
-                <Settings className="h-3.5 w-3.5" />
-              </Button>
-            </QuickTooltip>
+          )}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span
+                className={cn(
+                  "h-2.5 w-2.5 rounded-full",
+                  data.status === "running" && data.method === "WebSocket"
+                    ? "bg-success"
+                    : statusClass(data.status),
+                )}
+              />
+              <span className="text-[11px] uppercase tracking-wide text-foreground/70">
+                {data.status === "running" && data.method === "WebSocket"
+                  ? "live"
+                  : data.status}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <QuickTooltip content="Delete node">
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="h-7 w-7 p-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    data.onDelete();
+                  }}
+                  aria-label="Delete node"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </QuickTooltip>
+              <QuickTooltip content="Node settings">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 w-7 p-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    data.onOpenSettings();
+                  }}
+                  aria-label="Open node settings"
+                >
+                  <Settings className="h-3.5 w-3.5" />
+                </Button>
+              </QuickTooltip>
+            </div>
           </div>
         </div>
       </div>
@@ -417,6 +433,7 @@ function NodeGraphCanvasInner({
         data: {
           label: node.name || node.method,
           method: node.method,
+          transport: getMethodEntry(node.method)?.transport ?? "jsonrpc",
           status: node.status,
           output: node.output,
           callCount: callCountsByNodeId[node.id] ?? 0,

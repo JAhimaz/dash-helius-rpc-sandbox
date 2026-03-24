@@ -7,6 +7,7 @@ export type MethodCategoryId =
   | "wallet-api"
   | "zk-compression"
   | "websockets"
+  | "priority-fee"
   | "custom";
 export type MethodTransport = "jsonrpc" | "http" | "custom" | "websocket";
 export type HttpMethod = "GET" | "POST";
