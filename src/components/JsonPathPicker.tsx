@@ -283,7 +283,7 @@ export function JsonPathPicker({
         />
       </div>
 
-      <div className="max-h-48 overflow-auto rounded-md border border-border bg-foreground/5 py-1">
+      <div className="max-h-48 overflow-auto rounded-md border border-border bg-[var(--surface-strong)] py-1">
         {activeNode?.output === undefined ? (
           <p className="p-3 text-center text-xs text-foreground/45">Run the source node first to see available paths.</p>
         ) : filteredTree.length === 0 ? (

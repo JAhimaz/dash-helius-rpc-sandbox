@@ -131,7 +131,7 @@ export function NodeSettingsDialog({
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-foreground/20 p-6 backdrop-blur-sm"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-6 backdrop-blur-sm"
       onMouseDown={onClose}
       role="presentation"
     >
@@ -290,7 +290,7 @@ export function NodeSettingsDialog({
                     {node.error}
                   </div>
                 ) : null}
-                <pre className="min-h-full overflow-x-auto whitespace-pre-wrap break-words rounded-md border border-border bg-[#1a1a1c] p-3 text-xs text-[#e0e0e0]">
+                <pre className="min-h-full overflow-x-auto whitespace-pre-wrap break-words rounded-md border border-border bg-[var(--code-bg)] p-3 text-xs text-[var(--code-text)]">
                   {outputText}
                 </pre>
               </div>

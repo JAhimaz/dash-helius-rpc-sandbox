@@ -231,7 +231,7 @@ export function ParamEditor({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <p className="text-sm font-medium text-foreground">Input</p>
-              <p className="text-xs text-foreground/65">Data available as <code className="rounded bg-foreground/10 px-1">input</code> in the script.</p>
+              <p className="text-xs text-foreground/65">Data available as <code className="rounded bg-white/10 px-1">input</code> in the script.</p>
             </div>
             <select
               className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
@@ -277,8 +277,8 @@ export function ParamEditor({
           <div>
             <p className="text-sm font-medium text-foreground">Code</p>
             <p className="text-xs text-foreground/65">
-              JavaScript function body. Access data via <code className="rounded bg-foreground/10 px-1">input</code>. Use <code className="rounded bg-foreground/10 px-1">return</code> to set the output.
-              Returning <code className="rounded bg-foreground/10 px-1">null</code> skips downstream nodes in a List iteration.
+              JavaScript function body. Access data via <code className="rounded bg-white/10 px-1">input</code>. Use <code className="rounded bg-white/10 px-1">return</code> to set the output.
+              Returning <code className="rounded bg-white/10 px-1">null</code> skips downstream nodes in a List iteration.
             </p>
           </div>
           <Textarea

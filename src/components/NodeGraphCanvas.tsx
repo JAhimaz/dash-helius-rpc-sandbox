@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
 
 const NODE_WIDTH = 330;
 const NODE_HEIGHT = 168;
-const EDGE_COLOR = "#c8c8c8";
+const EDGE_COLOR = "var(--edge-color)";
 
 export interface NodeGraphConnection {
   id: string;
@@ -95,7 +95,7 @@ function statusClass(status: WorkflowNode["status"]): string {
 
 // ── Handle style (invisible dots, just connection points) ──
 
-const activeHandleStyle = { background: "#c8c8c8", width: 8, height: 8, border: "none", borderRadius: "50%" };
+const activeHandleStyle = { background: "var(--handle-color)", width: 8, height: 8, border: "none", borderRadius: "50%" };
 const hiddenHandleStyle = { background: "transparent", width: 8, height: 8, border: "none" };
 
 // ── Custom node component ──
@@ -104,9 +104,9 @@ function WorkflowNodeCard({ data }: NodeProps<Node<WorkflowNodeData>>) {
   return (
     <div
       className={cn(
-        "rounded-lg border bg-[color-mix(in_srgb,var(--surface-soft)_90%,white_10%)] shadow-[0_4px_16px_-6px_rgba(0,0,0,0.1)] select-none transition-[border-color] duration-200",
+        "rounded-lg border bg-[var(--surface)] shadow-[0_4px_16px_-6px_var(--node-shadow)] select-none transition-[border-color] duration-200",
         data.isSelected
-          ? "border-foreground"
+          ? "border-primary"
           : "border-border",
       )}
       style={{ width: NODE_WIDTH, height: NODE_HEIGHT }}
@@ -133,7 +133,7 @@ function WorkflowNodeCard({ data }: NodeProps<Node<WorkflowNodeData>>) {
             </p>
           </div>
           <div className="text-right">
-            <span className="rounded border border-border/70 bg-foreground/8 px-2 py-0.5 font-mono text-[11px] text-foreground/80">
+            <span className="rounded border border-border bg-[var(--surface-strong)] px-2 py-0.5 font-mono text-[11px] text-foreground/80">
               {data.callCount} / {data.callTarget === null ? "-" : data.callTarget}
             </span>
             <p className="mt-1 text-[11px] text-foreground/50">
@@ -168,8 +168,8 @@ function WorkflowNodeCard({ data }: NodeProps<Node<WorkflowNodeData>>) {
               className={cn(
                 "inline-block rounded px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase leading-none",
                 data.transport === "websocket"
-                  ? "bg-amber-100 text-amber-700"
-                  : "bg-blue-100 text-blue-700",
+                  ? "bg-[var(--badge-yellow-bg)] text-[var(--badge-yellow-text)]"
+                  : "bg-[var(--badge-blue-bg)] text-[var(--badge-blue-text)]",
               )}
             >
               {data.transport === "websocket" ? "WSS" : "POST"}
@@ -307,7 +307,7 @@ function CanvasControls({
         <QuickTooltip content="Execute all">
           <Button
             size="sm"
-            className="h-8 w-8 p-0 bg-success text-white hover:bg-[#5a9c66]"
+            className="h-8 w-8 p-0 bg-success text-white hover:bg-[#2ea043]"
             onClick={onExecuteAll}
             disabled={isExecuting || !hasNodes}
             aria-label="Execute all"
@@ -570,9 +570,9 @@ function NodeGraphCanvasInner({
         nodesDraggable
         panOnDrag
         zoomOnScroll
-        className="!bg-[var(--background)]"
+        className="!bg-[var(--canvas-bg)]"
       >
-        <Background variant={BackgroundVariant.Dots} color="rgba(0,0,0,0.25)" gap={24} size={1.5} />
+        <Background variant={BackgroundVariant.Dots} color={typeof window !== "undefined" ? getComputedStyle(document.documentElement).getPropertyValue("--canvas-dot").trim() || "rgba(0,0,0,0.15)" : "rgba(0,0,0,0.15)"} gap={24} size={1.5} />
         <CanvasControls
           isExecuting={isExecuting}
           hasActiveWebSockets={hasActiveWebSockets}

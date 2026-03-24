@@ -280,7 +280,7 @@ export function NodeCard({
                       {node.error}
                     </div>
                   ) : null}
-                  <pre className="min-h-full rounded-md border border-border bg-[#1a1a1c] p-3 text-xs text-[#e0e0e0]">
+                  <pre className="min-h-full rounded-md border border-border bg-[var(--code-bg)] p-3 text-xs text-[var(--code-text)]">
                     {outputText}
                   </pre>
                 </div>
