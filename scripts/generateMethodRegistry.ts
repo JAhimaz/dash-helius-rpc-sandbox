@@ -17,7 +17,7 @@ const OUTPUT_PATH = "src/lib/generatedMethodRegistry.json";
 async function fetchHtml(url: string): Promise<string> {
   const response = await fetch(url, {
     headers: {
-      "user-agent": "helius-flow-method-registry-generator/1.0",
+      "user-agent": "dash-flow-method-registry-generator/1.0",
     },
   });
 

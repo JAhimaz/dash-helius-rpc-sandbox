@@ -195,7 +195,7 @@ const DEFAULT_HELIUS_WS_URLS: Record<RpcNetwork, string> = {
   testnet: "wss://testnet.helius-rpc.com",
 };
 const GATEKEEPER_RPC_URL = "https://beta.helius-rpc.com/";
-const SESSION_STORAGE_API_KEY = "helius-flow:api-key";
+const SESSION_STORAGE_API_KEY = "dash-flow:api-key";
 
 function resolveParamValue(
   paramValue: WorkflowNode["params"][number]["value"],
@@ -997,7 +997,7 @@ export default function HomePage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `helius-flow-console-${Date.now()}.txt`;
+    a.download = `dash-flow-console-${Date.now()}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };

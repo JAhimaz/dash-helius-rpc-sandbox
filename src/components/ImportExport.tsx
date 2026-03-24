@@ -27,7 +27,7 @@ export function ImportExport({
   const [message, setMessage] = useState<string>("");
   const [showExportPanel, setShowExportPanel] = useState(false);
   const [fileName, setFileName] = useState(
-    () => `helius-flow-${new Date().toISOString().slice(0, 10)}`,
+    () => `dash-flow-${new Date().toISOString().slice(0, 10)}`,
   );
 
   // Close dropdown on outside click
@@ -44,7 +44,7 @@ export function ImportExport({
 
   const doExport = () => {
     const payload = onExport(includeOutputs);
-    const safeName = fileName.trim() || "helius-flow-export";
+    const safeName = fileName.trim() || "dash-flow-export";
     const fullName = safeName.endsWith(".json") ? safeName : `${safeName}.json`;
 
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
