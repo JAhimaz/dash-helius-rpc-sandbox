@@ -227,73 +227,99 @@ function parseRawParams(raw: string): unknown {
  * page, cookies, localStorage, or same-origin content. Communication happens
  * via postMessage with structured-clone-safe data only.
  */
-function runSandboxedScript(code: string, input: unknown): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    const iframe = document.createElement("iframe");
-    // allow-scripts lets JS run; no allow-same-origin means the iframe
-    // cannot access the parent page, cookies, localStorage, etc.
-    iframe.sandbox.add("allow-scripts");
-    iframe.style.display = "none";
-    document.body.appendChild(iframe);
+/**
+ * Persistent sandboxed iframe for running user JS. One iframe is created
+ * on first use and reused for all subsequent calls. No access to parent
+ * page, cookies, localStorage, or same-origin content.
+ */
+const scriptSandbox = (() => {
+  let iframe: HTMLIFrameElement | null = null;
+  let ready = false;
+  let pendingResolve: ((v: unknown) => void) | null = null;
+  let pendingReject: ((e: Error) => void) | null = null;
+  let pendingTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const TIMEOUT_MS = 10_000;
-    let settled = false;
+  function onMessage(event: MessageEvent) {
+    if (!iframe || event.source !== iframe.contentWindow) return;
+    const data = event.data as { type?: string; ok?: boolean; value?: unknown; error?: string };
+    if (data.type === "ready") {
+      ready = true;
+      return;
+    }
+    if (pendingTimer) clearTimeout(pendingTimer);
+    pendingTimer = null;
+    const res = pendingResolve;
+    const rej = pendingReject;
+    pendingResolve = null;
+    pendingReject = null;
+    if (data.ok) {
+      res?.(data.value);
+    } else {
+      rej?.(new Error(data.error ?? "Script execution failed."));
+    }
+  }
 
-    const cleanup = () => {
-      if (settled) return;
-      settled = true;
-      window.removeEventListener("message", onMessage);
-      iframe.remove();
-    };
-
-    const timer = setTimeout(() => {
-      cleanup();
-      reject(new Error("Script timed out (10s limit)."));
-    }, TIMEOUT_MS);
-
-    const onMessage = (event: MessageEvent) => {
-      if (event.source !== iframe.contentWindow) return;
-      clearTimeout(timer);
-      cleanup();
-      const { ok, value, error } = event.data as { ok: boolean; value?: unknown; error?: string };
-      if (ok) {
-        resolve(value);
-      } else {
-        reject(new Error(error ?? "Script execution failed."));
+  function ensureIframe(): Promise<void> {
+    if (iframe && ready) return Promise.resolve();
+    return new Promise((resolve) => {
+      if (iframe) {
+        // Already created but waiting for ready
+        const check = setInterval(() => {
+          if (ready) { clearInterval(check); resolve(); }
+        }, 10);
+        return;
       }
-    };
+      iframe = document.createElement("iframe");
+      iframe.sandbox.add("allow-scripts");
+      iframe.style.display = "none";
+      document.body.appendChild(iframe);
+      window.addEventListener("message", onMessage);
 
-    window.addEventListener("message", onMessage);
-
-    const script = `
-      <script>
+      iframe.srcdoc = `<script>
         "use strict";
         (function() {
-          // Capture real parent ref before sandboxing
           var _host = window.parent;
-          // Block user code from accessing parent/top
           try { Object.defineProperty(window, "parent", { value: window }); } catch {}
           try { Object.defineProperty(window, "top", { value: window }); } catch {}
-
           window.addEventListener("message", function(e) {
+            if (!e.data || typeof e.data.id !== "number") return;
             try {
               var fn = new Function("input", e.data.code);
               var result = fn(e.data.input);
-              _host.postMessage({ ok: true, value: result }, "*");
+              _host.postMessage({ id: e.data.id, ok: true, value: result }, "*");
             } catch (err) {
-              _host.postMessage({ ok: false, error: err.message || String(err) }, "*");
+              _host.postMessage({ id: e.data.id, ok: false, error: err.message || String(err) }, "*");
             }
           });
+          _host.postMessage({ type: "ready" }, "*");
         })();
-      <\/script>
-    `;
+      <\/script>`;
 
-    iframe.srcdoc = script;
-    iframe.onload = () => {
-      if (settled) return;
-      iframe.contentWindow?.postMessage({ code, input }, "*");
-    };
-  });
+      const check = setInterval(() => {
+        if (ready) { clearInterval(check); resolve(); }
+      }, 10);
+    });
+  }
+
+  return {
+    async run(code: string, input: unknown): Promise<unknown> {
+      await ensureIframe();
+      return new Promise((resolve, reject) => {
+        pendingResolve = resolve;
+        pendingReject = reject;
+        pendingTimer = setTimeout(() => {
+          pendingResolve = null;
+          pendingReject = null;
+          reject(new Error("Script timed out (5s limit)."));
+        }, 5_000);
+        iframe!.contentWindow?.postMessage({ id: Date.now(), code, input }, "*");
+      });
+    },
+  };
+})();
+
+function runSandboxedScript(code: string, input: unknown): Promise<unknown> {
+  return scriptSandbox.run(code, input);
 }
 
 function pruneNullish(value: unknown): unknown {
@@ -890,6 +916,19 @@ function calculatePlannedCallCounts(
 
     const node = nodes[nodeId];
     if (!node) {
+      continue;
+    }
+
+    // Check if this node is driven by a List iteration
+    const listRef = getListReference(node, nodes);
+    if (listRef) {
+      // List-driven nodes have unknown iteration count at plan time
+      setPlannedCallCountInfinite(callCountsByNodeId, nodeId);
+      const downstreamNodeIds = getReferencedDownstreamNodeIds(executionOrder, nodes, nodeId, includedNodeIds);
+      for (const downstreamNodeId of downstreamNodeIds) {
+        setPlannedCallCountInfinite(callCountsByNodeId, downstreamNodeId);
+        skippedNodeIds.add(downstreamNodeId);
+      }
       continue;
     }
 
@@ -1665,6 +1704,7 @@ export default function HomePage() {
 
         if (node.method === "Script" && (output === null || output === undefined)) {
           outputsByNodeId.set(node.id, output);
+          setNodeStatus(node.id, "success");
           return { success: true };
         }
 
@@ -1952,7 +1992,7 @@ export default function HomePage() {
     const initialCallTargets: Record<string, PlannedCallCount> = {};
     const initialCallCounts: Record<string, number> = {};
     for (const nodeId of orderSnapshot) {
-      initialCallTargets[nodeId] = plannedCallCounts.get(nodeId) ?? 0;
+      initialCallTargets[nodeId] = plannedCallCounts.has(nodeId) ? plannedCallCounts.get(nodeId)! : 0;
       initialCallCounts[nodeId] = 0;
     }
     setNodeCallTargets(initialCallTargets);
@@ -2037,35 +2077,36 @@ export default function HomePage() {
 
             const originalListOutput = outputsByNodeId.get(listRef.listNodeId);
 
-            for (let i = 0; i < listArray.length; i += 1) {
-              if (executionController.signal.aborted) {
-                return { success: false, canceled: true, errorMessage: "Execution stopped by user." };
+            try {
+              for (let i = 0; i < listArray.length; i += 1) {
+                if (executionController.signal.aborted) {
+                  return { success: false, canceled: true, errorMessage: "Execution stopped by user." };
+                }
+
+                if (hasEach) {
+                  const wrapper = buildNestedWrapper(listRef.path, listArray[i]);
+                  outputsByNodeId.set(listRef.listNodeId, wrapper);
+                } else {
+                  outputsByNodeId.set(listRef.listNodeId, listArray[i]);
+                }
+
+                const result = await executeSingleNode(nodeId, outputsByNodeId, executionController.signal);
+                if (!result.success) return result;
+
+                // Skip downstream if output is null (filtered)
+                const currentOutput = outputsByNodeId.get(nodeId);
+                if (currentOutput === null || currentOutput === undefined) continue;
+
+                for (const downstreamNodeId of iterationDownstream) {
+                  const dsResult = await executeSingleNode(downstreamNodeId, outputsByNodeId, executionController.signal);
+                  if (!dsResult.success) return dsResult;
+                  const dsOutput = outputsByNodeId.get(downstreamNodeId);
+                  if (dsOutput === null || dsOutput === undefined) break;
+                }
               }
-
-              if (hasEach) {
-                // Build a minimal wrapper object so that
-                // getByPath(wrapper, originalPath) resolves to the single item.
-                // getByPath skips [] on non-arrays, so the navigation still works.
-                const wrapper = buildNestedWrapper(listRef.path, listArray[i]);
-                outputsByNodeId.set(listRef.listNodeId, wrapper);
-              } else {
-                outputsByNodeId.set(listRef.listNodeId, listArray[i]);
-              }
-
-              const result = await executeSingleNode(nodeId, outputsByNodeId, executionController.signal);
-              if (!result.success) return result;
-
-              // Skip downstream if output is null (filtered)
-              const currentOutput = outputsByNodeId.get(nodeId);
-              if (currentOutput === null || currentOutput === undefined) continue;
-
-              for (const downstreamNodeId of iterationDownstream) {
-                const dsResult = await executeSingleNode(downstreamNodeId, outputsByNodeId, executionController.signal);
-                if (!dsResult.success) return dsResult;
-                // If this downstream node returned null, skip the rest of the chain for this iteration
-                const dsOutput = outputsByNodeId.get(downstreamNodeId);
-                if (dsOutput === null || dsOutput === undefined) break;
-              }
+            } finally {
+              // Always mark the iterated node as success after loop ends
+              setNodeStatus(nodeId, "success");
             }
 
             if (originalListOutput !== undefined) {

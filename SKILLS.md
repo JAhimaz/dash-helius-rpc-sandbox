@@ -216,6 +216,54 @@ All standard Solana and Helius RPC methods. Key ones:
 |---|---|---|
 | `getPriorityFeeEstimate` | `transaction` or `accountKeys` | Get recommended priority fees for optimal tx inclusion |
 
+## Common Output Structures
+
+When referencing output from RPC nodes, you must know the response shape to build correct paths. The node's output is the `result` field from the JSON-RPC response. Here are the common patterns:
+
+### Direct value (no wrapper)
+These methods return the value directly as the node output:
+- `getBalance` → `{ context: { slot }, value: 123456 }` — use path `value` for lamports
+- `getSlot` → `1234` — use path `""` (entire output is the number)
+- `getBlockHeight` → `166500` — use path `""`
+- `getTransactionCount` → `268` — use path `""`
+- `getHealth` → `"ok"` — use path `""`
+- `getVersion` → `{ "solana-core": "1.16.7", "feature-set": 2891131721 }`
+- `getGenesisHash` → `"GH7ome3..."` — use path `""`
+- `getLatestBlockhash` → `{ context: { slot }, value: { blockhash, lastValidBlockHeight } }`
+- `getEpochInfo` → `{ absoluteSlot, blockHeight, epoch, slotIndex, slotsInEpoch, transactionCount }`
+
+### Array at root
+These return an array directly:
+- `getClusterNodes` → `[{ pubkey, gossip, tpu, rpc, version, ... }, ...]`
+- `getSignaturesForAddress` → `[{ signature, slot, err, memo, blockTime, confirmationStatus }, ...]`
+- `getSlotLeaders` → `["pubkey1", "pubkey2", ...]`
+- `getInflationReward` → `[{ epoch, effectiveSlot, amount, postBalance, commission }, ...]`
+
+### Wrapped in `data` array (Helius enhanced methods)
+**Important:** `getTransactionsForAddress` wraps results differently from standard Solana RPC:
+- `getTransactionsForAddress` → `{ data: [...transactions], paginationToken: "..." }` — use path `data` to get the array, NOT `""` (root)
+
+### Wrapped in `context` + `value`
+Many standard RPC methods wrap results:
+- `getAccountInfo` → `{ context: { slot }, value: { lamports, owner, data, executable, rentEpoch } }`
+- `getTokenAccountsByOwner` → `{ context: { slot }, value: [{ pubkey, account: {...} }, ...] }` — use path `value` for the array
+- `getTokenAccountBalance` → `{ context: { slot }, value: { amount, decimals, uiAmount, uiAmountString } }`
+- `getLargestAccounts` → `{ context: { slot }, value: [{ lamports, address }, ...] }` — use path `value`
+- `getSupply` → `{ context: { slot }, value: { total, circulating, nonCirculating } }`
+- `getMultipleAccounts` → `{ context: { slot }, value: [account | null, ...] }` — use path `value`
+
+### Transaction detail
+- `getTransaction` → `{ slot, transaction: { message: { accountKeys, instructions, ... }, signatures }, meta: { err, fee, preBalances, postBalances, preTokenBalances, postTokenBalances, ... } }`
+
+### Full transaction from `getTransactionsForAddress` with `transactionDetails: "full"`
+Each item in `data` has: `{ slot, transaction: {...}, meta: {...}, blockTime }`
+
+### Key rule for reference paths
+- If the API returns `{ data: [...] }`, the path to the array is `data`
+- If the API returns `{ context, value }`, the path to the useful data is usually `value`
+- If the API returns a raw array or primitive, use `""` (empty path = entire output)
+- For nested fields: `meta.postTokenBalances`, `transaction.message.accountKeys`, etc.
+
 ## Repeat Configuration
 
 Optional. Runs a node multiple times on an interval.
