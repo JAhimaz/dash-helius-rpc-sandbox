@@ -1703,6 +1703,8 @@ export default function HomePage() {
         }
 
         if (node.method === "Script" && (output === null || output === undefined)) {
+          // Set null in runtime map so downstream nodes skip this iteration,
+          // but don't overwrite the store output — keep last non-null result visible for referencing
           outputsByNodeId.set(node.id, output);
           setNodeStatus(node.id, "success");
           return { success: true };
