@@ -1,4 +1,5 @@
 ---
+name: dash-build-workflow
 description: Generate valid workflow JSON for DASH, a visual Solana RPC workflow builder. Use this skill when users ask to build, create, or generate a workflow.
 ---
 
